@@ -1,0 +1,4 @@
+# 에이전트 스킬 (npx skills add 로 설치되는 파일)
+.agents/
+.claude/skills/
+skills-lock.json
