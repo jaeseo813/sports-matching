@@ -2,3 +2,19 @@
 .agents/
 .claude/skills/
 skills-lock.json
+
+# 시크릿·환경변수 (절대 커밋 금지)
+.env
+.env.*
+!.env.example
+
+# 백엔드 / OS / IDE
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.idea/
+.vscode/
