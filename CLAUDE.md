@@ -23,6 +23,8 @@
 backend/app/{core,models,schemas,api/v1,services,repositories}  backend/tests/{services,security}
 frontend/src/{pages,features,components/ui,lib/api}            docs/security/{threat-model.md,findings/}
 ```
+- **공통 코어 vs 종목 모듈**: 인증·유저·구장·매치·신청·추천·레이팅은 **종목 무관 공통 코어 하나**(DB도 하나, 종목은 `sport` 컬럼으로 구분). 종목마다 다른 것(포지션·팀 인원·밸런서 제약·티어 설명·FAQ)만 `backend/app/sports/<종목>/`(프론트 `src/sports/<종목>/`과 id 동일)에 둔다. 종목 담당자는 자기 종목 폴더 안에서만 작업하고, 코어/스키마 변경은 PR 리뷰 필수. 종목별 별도 백엔드·DB 금지.
+- 디자인: 종목 페이지 안은 자유, 공통 요소(색 토큰·티어 배지·버튼·카드)는 `components/` 공유 컴포넌트 사용. W10쯤 모여서 베스트 디자인을 골라 통일한다. 3탭 UX 원칙은 유지.
 - 비즈니스 로직은 `services/`에만. 라우터는 검증 → 서비스 호출 → 응답 변환만.
 - 공간 raw SQL은 `repositories/`에만.
 - `services/matching.py`, `skill.py`, `balancer.py`는 **DB 없이 테스트 가능한 순수 함수**, 분기 전부 단위 테스트.
