@@ -1,0 +1,35 @@
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: teamup
+      MARIADB_USER: teamup
+      MARIADB_PASSWORD: ${DB_PASSWORD:-change-me}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-change-me-root}
+    ports: ["127.0.0.1:3306:3306"]
+    volumes: [db_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+
+  # 기본은 db·redis만 띄우고 uvicorn은 로컬에서 실행한다. API까지 컨테이너로 보려면:
+  #   docker compose --profile api up -d
+  api:
+    profiles: ["api"]
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql+asyncmy://teamup:${DB_PASSWORD:-change-me}@db:3306/teamup
+      REDIS_URL: redis://redis:6379/0
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
+volumes:
+  db_data:
