@@ -1,0 +1,33 @@
+name: backend
+on:
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app
+      - run: uv run pytest -q
+      # 보안 게이트 (CLAUDE.md 5절)
+      - run: uv run bandit -r app -ll
+      - run: uv run ruff check --select S app
+      - run: uv run pip-audit
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
