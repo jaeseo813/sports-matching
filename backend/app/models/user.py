@@ -25,7 +25,7 @@ class User(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    password: Mapped[str] = mapped_column(String(255))  # 임시: 원문 저장 (팀 결정)
     nickname: Mapped[str] = mapped_column(String(30), unique=True)
     gender: Mapped[Gender] = mapped_column(str_enum(Gender))
     birth_year: Mapped[int] = mapped_column(SmallInteger)  # 미성년자 가입 제외 판단용

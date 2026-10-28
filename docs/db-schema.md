@@ -28,7 +28,7 @@ erDiagram
 ## 테이블
 | 테이블 | 핵심 컬럼 | 제약·인덱스 |
 |---|---|---|
-| `users` | email, password_hash, nickname, gender, birth_year, role, manner_score, games_played, no_show_count, is_active, deleted_at | email·nickname 유니크 |
+| `users` | email, password, nickname, gender, birth_year, role, manner_score, games_played, no_show_count, is_active, deleted_at | email·nickname 유니크 |
 | `user_locations` | user_id, slot(1~2), label, point, max_distance_km | (user_id, slot) 유니크 → 최대 2개, SPATIAL INDEX(point) |
 | `user_skills` | user_id, sport, self_tier(1~5), years_played, rating, rd, volatility, trend, games_rated, positions(JSON) | (user_id, sport) 유니크 |
 | `venues` | name, address, point, created_by, is_active | SPATIAL INDEX(point) |
