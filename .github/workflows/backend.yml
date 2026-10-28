@@ -17,7 +17,9 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy app
       - run: uv run pytest -q
-      # 보안 게이트 (CLAUDE.md 5절)
+      # 마이그레이션 head가 갈라지지 않았는지 (두 개 이상이면 실패)
+      - run: test "$(uv run alembic heads 2>/dev/null | grep -c '(head)')" -eq 1
+      # 보안 게이트 (AGENTS.md 5절)
       - run: uv run bandit -r app -ll
       - run: uv run ruff check --select S app
       - run: uv run pip-audit

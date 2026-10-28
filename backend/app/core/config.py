@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # 환경변수는 이 클래스로만 읽는다 (os.environ 직접 접근 금지)
     model_config = SettingsConfigDict(env_file=_ROOT_ENV, extra="ignore")
 
-    app_name: str = "TeamUp"  # 가칭 — 확정되면 CLAUDE.md와 함께 수정
+    app_name: str = "TeamUp"  # 가칭 — 확정되면 AGENTS.md와 함께 수정
     env: Literal["local", "staging", "production"] = "local"
     cors_origins: list[str] = ["http://localhost:5173"]
 
