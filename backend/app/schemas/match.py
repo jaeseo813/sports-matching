@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import GenderPolicy, MatchStatus, ParticipationStatus
+from app.models.enums import GenderPolicy, MatchStatus, ParticipationStatus, Verdict
 
 
 class MatchCreateIn(BaseModel):
@@ -108,3 +108,29 @@ class ManualTeamsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     assignments: list[TeamAssignmentIn] = Field(min_length=2, max_length=60)
+
+
+class ReviewIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reviewee_id: int = Field(ge=1)
+    verdict: Verdict
+    manner_flag: bool = False
+
+
+class AttendanceItemIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: int = Field(ge=1)
+    attended: bool
+
+
+class AttendanceIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attendances: list[AttendanceItemIn] = Field(min_length=1, max_length=60)
+
+
+class RateOut(BaseModel):
+    applied: bool  # False면 리뷰가 부족해 반영을 보류했다 (rated_at도 설정하지 않음)
+    updated: int = 0

@@ -12,6 +12,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +37,8 @@ class User(TimestampMixin, Base):
     no_show_count: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)  # 탈퇴 시각
+    # 선호 시간대 (dawn/morning/afternoon/evening). 비어 있으면 제약 없음
+    preferred_slots: Mapped[list[str] | None] = mapped_column(JSON)
 
 
 class UserLocation(TimestampMixin, Base):
@@ -77,3 +80,18 @@ class UserSkill(TimestampMixin, Base):
     trend: Mapped[int] = mapped_column(SmallInteger, default=0)  # -1 ↓ / 0 → / 1 ↑
     games_rated: Mapped[int] = mapped_column(Integer, default=0)
     positions: Mapped[list[str] | None] = mapped_column(JSON)  # 선호 포지션 (종목별 값)
+
+
+class UserBlock(Base):
+    """차단. blocker가 blocked를 차단하면 blocked가 연 매치는 blocker에게 추천되지 않는다."""
+
+    __tablename__ = "user_blocks"
+    __table_args__ = (CheckConstraint("blocker_id <> blocked_id", name="ck_user_blocks_self"),)
+
+    blocker_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    blocked_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -107,7 +107,8 @@ async def recommend(
             for c in commitments
             if c.status in (ParticipationStatus.APPLIED, ParticipationStatus.ACCEPTED)
         ),
-        # TODO: 차단 목록·선호 시간대는 저장할 곳이 없어 스키마 변경(코어 PR) 후 연결한다
+        preferred_slots=frozenset(user.preferred_slots or []),
+        blocked_hosts=frozenset(uid for uid, _ in await profiles.list_blocks(user.id)),
     )
 
     base = await recs.active_weights() or Weights()

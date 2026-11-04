@@ -7,6 +7,7 @@ from app.api.deps import (
     MatchRepo,
     ProfileRepo,
     RecommendRepo,
+    ReviewRepo,
     TeamRepo,
     UserRepo,
     VenueRepo,
@@ -15,15 +16,19 @@ from app.core.ratelimit import RateLimiter
 from app.models.enums import MatchStatus, ParticipationStatus
 from app.schemas.match import (
     ApplyIn,
+    AttendanceIn,
     ManualTeamsIn,
     MatchCreateIn,
     MatchOut,
     ParticipationOut,
+    RateOut,
     RecommendedOut,
+    ReviewIn,
     TeamsOut,
 )
 from app.services import matches as match_service
 from app.services import recommend as recommend_service
+from app.services import reviews as review_service
 from app.services import teams as team_service
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -172,3 +177,26 @@ async def set_teams(
     match_id: int, data: ManualTeamsIn, user: CurrentUser, matches: MatchRepo, teams: TeamRepo
 ) -> TeamsOut:
     return await team_service.set_manual(matches, teams, user, match_id, data)
+
+
+@router.put("/{match_id}/attendance", status_code=204)
+async def set_attendance(
+    match_id: int, data: AttendanceIn, user: CurrentUser, matches: MatchRepo, reviews: ReviewRepo
+) -> Response:
+    await review_service.set_attendance(matches, reviews, user, match_id, data)
+    return Response(status_code=204)
+
+
+@router.post("/{match_id}/reviews", status_code=204)
+async def submit_review(
+    match_id: int, data: ReviewIn, user: CurrentUser, matches: MatchRepo, reviews: ReviewRepo
+) -> Response:
+    await review_service.submit_review(matches, reviews, user, match_id, data)
+    return Response(status_code=204)
+
+
+@router.post("/{match_id}/rate", response_model=RateOut)
+async def rate(
+    match_id: int, user: CurrentUser, matches: MatchRepo, reviews: ReviewRepo
+) -> RateOut:
+    return await review_service.apply_ratings(matches, reviews, user, match_id)

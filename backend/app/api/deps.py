@@ -11,6 +11,7 @@ from app.models.user import User
 from app.repositories.match import MatchRepository, SqlMatchRepository
 from app.repositories.profile import ProfileRepository, SqlProfileRepository
 from app.repositories.recommend import RecommendRepository, SqlRecommendRepository
+from app.repositories.review import ReviewRepository, SqlReviewRepository
 from app.repositories.team import SqlTeamRepository, TeamRepository
 from app.repositories.user import SqlUserRepository, UserRepository
 from app.repositories.venue import SqlVenueRepository, VenueRepository
@@ -96,3 +97,12 @@ async def get_team_repo(session: Annotated[AsyncSession, Depends(get_session)]) 
 
 
 TeamRepo = Annotated[TeamRepository, Depends(get_team_repo)]
+
+
+async def get_review_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReviewRepository:
+    return SqlReviewRepository(session)
+
+
+ReviewRepo = Annotated[ReviewRepository, Depends(get_review_repo)]

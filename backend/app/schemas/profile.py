@@ -38,3 +38,21 @@ class LocationOut(BaseModel):
     slot: int
     label: str
     max_distance_km: int
+
+
+TimeSlot = Literal["dawn", "morning", "afternoon", "evening"]  # 0-6 / 6-12 / 12-18 / 18-24시
+
+
+class PreferencesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preferred_slots: list[TimeSlot] = Field(max_length=4)
+
+
+class PreferencesOut(BaseModel):
+    preferred_slots: list[TimeSlot]
+
+
+class BlockOut(BaseModel):
+    user_id: int
+    nickname: str
