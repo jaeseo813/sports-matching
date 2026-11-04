@@ -8,6 +8,7 @@ from app.core.db import get_session
 from app.core.security import TokenError, decode_token
 from app.models.enums import Role
 from app.models.user import User
+from app.repositories.match import MatchRepository, SqlMatchRepository
 from app.repositories.user import SqlUserRepository, UserRepository
 from app.repositories.venue import SqlVenueRepository, VenueRepository
 
@@ -61,3 +62,9 @@ async def require_admin(user: Annotated[User, Depends(require_user)]) -> User:
 
 CurrentUser = Annotated[User, Depends(require_user)]
 
+
+async def get_match_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> MatchRepository:
+    return SqlMatchRepository(session)
+
+
+MatchRepo = Annotated[MatchRepository, Depends(get_match_repo)]
