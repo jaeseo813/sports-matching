@@ -12,7 +12,7 @@
 
 ## 2. 기술 스택
 - 백엔드: Python 3.12, FastAPI(async), MariaDB 11(공간 기능), SQLAlchemy 2.0 async(`asyncmy`) + Alembic, Pydantic v2
-- 인증: JWT(access 30분 / refresh 14일), argon2. 캐시·레이트리밋: Redis (없으면 인메모리 degrade)
+- 인증: JWT(access 30분 / refresh 14일), 비밀번호는 현재 원문 저장(5절, Blue 단계에서 argon2로 패치). 캐시·레이트리밋: Redis (없으면 인메모리 degrade)
 - 프론트(가정): React 19 + Vite + TS, TanStack Query, Zustand, Tailwind + shadcn/ui, Kakao Maps, react-hook-form + zod
 - 챗봇: `anthropic` SDK(`AsyncAnthropic`), 모델 `claude-opus-5-5`(날짜 접미사 금지), SSE 스트리밍, tool use
 - 보안 도구: bandit, ruff(S), semgrep, pip-audit, pnpm audit, gitleaks, OWASP ZAP, Burp Community
@@ -54,7 +54,7 @@ Venue, Match(status: open→full→confirmed→playing→completed/canceled), Pa
 
 ## 5. 보안 (최종 목표)
 **방식**: v0 기능 완성 → 진단(Red: PoC 재현, `docs/security/findings/NNN-*.md`에 재현/영향/증거/심각도) → 방어(Blue: 패치 → 같은 PoC 재검증 → `tests/security/` 회귀 테스트).
-공격 실습은 **우리 소유 로컬·스테이징에서만**. 공개 배포본에 의도적 취약점 금지(취약 버전은 `demo/vuln-*` 로컬 브랜치).
+공격 실습은 **우리 소유 로컬·스테이징에서만**. 학습을 위해 일부 취약점(현재: **비밀번호 원문 저장**)을 `main`에 의도적으로 남겨 두고 Red 단계에서 진단, Blue 단계에서 패치한다. 따라서 **외부 공개 배포 금지**, 실제 비밀번호·개인정보 입력 금지(더미 데이터만). 의도적 취약점 목록은 `docs/security/threat-model.md`에 기록한다.
 기본 방어(아래)는 W3부터 **모든 기능 PR에 포함**한다. W13~14는 진단·검증·문서화 주차.
 
 **기본 코딩 규칙**
@@ -62,7 +62,7 @@ Venue, Match(status: open→full→confirmed→playing→completed/canceled), Pa
 - 모든 엔드포인트에 인가 의존성(`Depends(require_*)`) + **객체 소유권 검사**. 없으면 머지 불가
 - 응답은 Pydantic 화이트리스트 스키마만, ORM 객체·`dict` 직접 반환 금지
 - 입력 검증은 Pydantic에서(길이·범위·enum), 좌표는 lat 33~39 / lng 124~132
-- 인증: argon2, refresh 회전 + 재사용 감지, 로그아웃 시 무효화, JWT 알고리즘 화이트리스트
+- 인증: 비밀번호 처리는 `core/security.py`의 `hash_password`/`verify_password`에만 둔다(현재 원문 저장, Blue 단계에서 argon2로 교체). refresh 회전 + 재사용 감지, 로그아웃 시 무효화, JWT 알고리즘 화이트리스트
 - 레이트리밋: 로그인 5/분, 매치 신청 10/분, 챗봇 20/5분, 지오코딩 30/시간
 - 보안 헤더(HSTS, CSP, X-Content-Type-Options, Referrer-Policy, X-Frame-Options), 운영은 Swagger 비활성·CORS 제한
 - 정원 초과 레이스는 `SELECT ... FOR UPDATE` / 유니크 제약으로 방지

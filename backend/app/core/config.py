@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     database_url: str = "mysql+asyncmy://teamup:change-me@localhost:3306/teamup"
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = _INSECURE_DEFAULT
+    access_token_minutes: int = 30
+    refresh_token_days: int = 14
     anthropic_api_key: str = ""
     kakao_map_key: str = ""
 
