@@ -10,9 +10,10 @@ export interface MatchCardProps {
   joined?: number;
   capacity?: number;
   reasons?: string[];
+  tierRange?: [number, number]; // 참가 가능 단계(tier_min~tier_max)
 }
 
-export default function MatchCard({ sport, title, venue, when, distance, joined, capacity, reasons }: MatchCardProps) {
+export default function MatchCard({ sport, title, venue, when, distance, joined, capacity, reasons, tierRange }: MatchCardProps) {
   return (
     <article className="rounded-xl border border-edge bg-white p-5">
       <div className="flex items-center justify-between">
@@ -34,6 +35,11 @@ export default function MatchCard({ sport, title, venue, when, distance, joined,
         {distance ? `, ${distance}` : ""}
       </p>
       <p className="text-sm text-muted">{when}</p>
+      {tierRange && (
+        <p className="mt-2 text-sm font-semibold">
+          참가 단계 {tierRange[0] === tierRange[1] ? tierRange[0] : `${tierRange[0]}~${tierRange[1]}`}
+        </p>
+      )}
       {reasons && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
           {reasons.map((r) => (

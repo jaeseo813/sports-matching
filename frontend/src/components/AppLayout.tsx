@@ -34,7 +34,7 @@ export default function AppLayout() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-10 px-4 pb-28 md:pb-12">
+      <main className="mx-auto max-w-6xl space-y-10 px-4 pb-28 pt-6 md:pb-12">
         <Outlet />
       </main>
 
