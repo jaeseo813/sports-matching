@@ -10,6 +10,7 @@ dependencies = [
     "asyncmy>=0.2.9",
     "alembic>=1.13",
     "pydantic-settings>=2.4",
+    "pyjwt>=2.8",
 ]
 
 [dependency-groups]
