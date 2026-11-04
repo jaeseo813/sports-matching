@@ -43,6 +43,7 @@ class Match(TimestampMixin, Base):
     tier_min: Mapped[int] = mapped_column(SmallInteger, default=1)
     tier_max: Mapped[int] = mapped_column(SmallInteger, default=5)
     status: Mapped[MatchStatus] = mapped_column(str_enum(MatchStatus), default=MatchStatus.OPEN)
+    rated_at: Mapped[datetime | None] = mapped_column(DateTime)  # 레이팅 반영 시각 (중복 반영 방지)
 
 
 class Participation(TimestampMixin, Base):

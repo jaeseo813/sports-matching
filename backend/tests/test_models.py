@@ -3,6 +3,7 @@ from app.models.types import GeoPoint
 
 EXPECTED_TABLES = {
     "users",
+    "user_blocks",
     "user_locations",
     "user_skills",
     "venues",
