@@ -2,11 +2,29 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from app.api.deps import CurrentUser, MatchRepo, UserRepo, VenueRepo
+from app.api.deps import (
+    CurrentUser,
+    MatchRepo,
+    ProfileRepo,
+    RecommendRepo,
+    TeamRepo,
+    UserRepo,
+    VenueRepo,
+)
 from app.core.ratelimit import RateLimiter
 from app.models.enums import MatchStatus, ParticipationStatus
-from app.schemas.match import MatchCreateIn, MatchOut, ParticipationOut
+from app.schemas.match import (
+    ApplyIn,
+    ManualTeamsIn,
+    MatchCreateIn,
+    MatchOut,
+    ParticipationOut,
+    RecommendedOut,
+    TeamsOut,
+)
 from app.services import matches as match_service
+from app.services import recommend as recommend_service
+from app.services import teams as team_service
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -35,6 +53,31 @@ async def list_matches(
     )
 
 
+@router.get("/recommended", response_model=list[RecommendedOut])
+async def recommended(
+    user: CurrentUser,
+    profiles: ProfileRepo,
+    recs: RecommendRepo,
+    matches: MatchRepo,
+    users: UserRepo,
+    venues: VenueRepo,
+    sport: Annotated[str, Query(max_length=20)],
+    distance_priority: Annotated[float | None, Query(ge=0, le=1)] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[RecommendedOut]:
+    return await recommend_service.recommend(
+        user=user,
+        sport=sport,
+        distance_priority=distance_priority,
+        limit=limit,
+        profiles=profiles,
+        recs=recs,
+        matches=matches,
+        users=users,
+        venues=venues,
+    )
+
+
 @router.get("/{match_id}", response_model=MatchOut)
 async def get_match(
     match_id: int, user: CurrentUser, matches: MatchRepo, users: UserRepo, venues: VenueRepo
@@ -49,9 +92,10 @@ async def get_match(
     dependencies=[Depends(apply_limiter)],
 )
 async def apply(
-    match_id: int, user: CurrentUser, matches: MatchRepo
+    match_id: int, user: CurrentUser, matches: MatchRepo, body: ApplyIn | None = None
 ) -> dict[str, ParticipationStatus]:
-    return {"status": await match_service.apply(matches, user, match_id)}
+    position = body.position if body else None
+    return {"status": await match_service.apply(matches, user, match_id, position)}
 
 
 @router.delete("/{match_id}/apply", status_code=204)
@@ -97,3 +141,34 @@ async def confirm(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[
 @router.post("/{match_id}/cancel", response_model=dict[str, MatchStatus])
 async def cancel(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[str, MatchStatus]:
     return {"status": await match_service.cancel_match(matches, user, match_id)}
+
+
+@router.post("/{match_id}/start", response_model=dict[str, MatchStatus])
+async def start(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[str, MatchStatus]:
+    return {"status": await match_service.start_match(matches, user, match_id)}
+
+
+@router.post("/{match_id}/complete", response_model=dict[str, MatchStatus])
+async def complete(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[str, MatchStatus]:
+    return {"status": await match_service.complete_match(matches, user, match_id)}
+
+
+@router.post("/{match_id}/teams/balance", response_model=TeamsOut)
+async def balance_teams(
+    match_id: int, user: CurrentUser, matches: MatchRepo, teams: TeamRepo
+) -> TeamsOut:
+    return await team_service.auto_balance(matches, teams, user, match_id)
+
+
+@router.get("/{match_id}/teams", response_model=TeamsOut)
+async def get_teams(
+    match_id: int, user: CurrentUser, matches: MatchRepo, teams: TeamRepo
+) -> TeamsOut:
+    return await team_service.get_teams(matches, teams, user, match_id)
+
+
+@router.put("/{match_id}/teams", response_model=TeamsOut)
+async def set_teams(
+    match_id: int, data: ManualTeamsIn, user: CurrentUser, matches: MatchRepo, teams: TeamRepo
+) -> TeamsOut:
+    return await team_service.set_manual(matches, teams, user, match_id, data)

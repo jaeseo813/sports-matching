@@ -62,6 +62,7 @@ async def venue_id(session: AsyncSession) -> int:
 
 
 async def login(api: AsyncClient, n: int, gender: str = "male") -> dict[str, str]:
+    login_limiter.reset()  # 한 테스트에서 여러 사용자가 로그인하므로 분당 5회 한도를 비운다
     body = {
         "email": f"user{n}@example.com",
         "password": "pw-12345678",
