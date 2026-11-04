@@ -2,7 +2,15 @@ from fastapi import HTTPException
 
 from app.models.user import User, UserLocation, UserSkill
 from app.repositories.profile import ProfileRepository
-from app.schemas.profile import LocationIn, LocationOut, SkillIn, SkillOut
+from app.schemas.profile import (
+    BlockOut,
+    LocationIn,
+    LocationOut,
+    PreferencesIn,
+    PreferencesOut,
+    SkillIn,
+    SkillOut,
+)
 from app.services.skill import initial_skill, tier_from_rating
 from app.sports.registry import SPORTS
 
@@ -89,4 +97,34 @@ async def set_location(
 
 async def delete_location(repo: ProfileRepository, user: User, slot: int) -> None:
     await repo.delete_location(user.id, slot)  # user_id 조건이 걸려 있어 본인 것만 지워진다
+    await repo.commit()
+
+
+def get_preferences(user: User) -> PreferencesOut:
+    return PreferencesOut(preferred_slots=user.preferred_slots or [])
+
+
+async def set_preferences(
+    repo: ProfileRepository, user: User, data: PreferencesIn
+) -> PreferencesOut:
+    user.preferred_slots = sorted(set(data.preferred_slots))
+    await repo.commit()
+    return get_preferences(user)
+
+
+async def list_blocks(repo: ProfileRepository, user: User) -> list[BlockOut]:
+    return [BlockOut(user_id=uid, nickname=nick) for uid, nick in await repo.list_blocks(user.id)]
+
+
+async def block(repo: ProfileRepository, user: User, target_id: int) -> None:
+    if target_id == user.id:
+        raise _error(422, "SELF_BLOCK", "자신을 차단할 수 없습니다")
+    if not await repo.user_exists(target_id):
+        raise _error(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다")
+    await repo.add_block(user.id, target_id)
+    await repo.commit()
+
+
+async def unblock(repo: ProfileRepository, user: User, target_id: int) -> None:
+    await repo.remove_block(user.id, target_id)  # blocker_id 조건이 걸려 있어 내 차단만 풀린다
     await repo.commit()
