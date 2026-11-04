@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CalendarCheck, Settings, Star, Users } from "lucide-react";
 import MatchCard from "../components/MatchCard";
+import SportPicker from "../components/SportPicker";
 import { sports } from "../sports/registry";
 
 // TODO: 예시 데이터(mock). API 연동 시 교체
@@ -27,7 +28,7 @@ export default function Dashboard() {
   return (
     <>
       {/* 인사 블록 */}
-      <section className="mt-6 rounded-xl bg-lime p-6 md:p-8">
+      <section className="rounded-xl bg-lime p-6 md:p-8">
         <div className="mx-auto flex max-w-6xl items-start justify-between">
           <div>
             <p className="text-sm">다시 만나서 반가워요</p>
@@ -37,6 +38,11 @@ export default function Dashboard() {
             <Settings size={20} aria-hidden="true" />
           </Link>
         </div>
+      </section>
+
+      <section aria-labelledby="pick-sport" className="!mt-8">
+        <h2 id="pick-sport" className="mb-4 text-xl font-extrabold">어떤 운동을 할까요?</h2>
+        <SportPicker />
       </section>
 
       {/* 큰 아이콘 버튼 형태의 활동 요약 */}
