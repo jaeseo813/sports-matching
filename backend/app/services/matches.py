@@ -31,7 +31,7 @@ def _gender_allowed(policy: GenderPolicy, gender: Gender) -> bool:
     return True
 
 
-async def _to_out(
+async def to_match_out(
     match: Match,
     joined: int,
     users: UserRepository,
@@ -72,6 +72,8 @@ async def create_match(
     rules = SPORTS.get(data.sport)
     if rules is None:
         raise _error(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다")
+    if data.position is not None and data.position not in rules.positions:
+        raise _error(422, "UNKNOWN_POSITION", "이 종목에 없는 포지션입니다")
     if data.team_size not in rules.players_per_team:
         raise _error(422, "INVALID_TEAM_SIZE", "이 종목에서 허용하지 않는 팀 인원입니다")
     venue = await venues.get(data.venue_id)
@@ -102,8 +104,9 @@ async def create_match(
     # 주최자도 경기에 뛰는 참가자라 정원에 포함한다 (팀 분배·최소 인원 계산에도 들어간다)
     host_part = await matches.add_participation(match.id, host.id)
     host_part.status = ParticipationStatus.ACCEPTED
+    host_part.position = data.position
     await matches.commit()
-    return await _to_out(match, 1, users, venues)
+    return await to_match_out(match, 1, users, venues)
 
 
 async def get_match(
@@ -118,7 +121,7 @@ async def get_match(
         raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
     part = await matches.get_participation(match_id, viewer.id)
     joined = await matches.count_accepted(match_id)
-    return await _to_out(match, joined, users, venues, part.status if part else None)
+    return await to_match_out(match, joined, users, venues, part.status if part else None)
 
 
 async def list_matches(
@@ -134,13 +137,17 @@ async def list_matches(
         raise _error(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다")
     found = await matches.list_open(sport=sport, limit=min(limit, MAX_PAGE), offset=offset)
     counts = await matches.accepted_counts([m.id for m in found])
-    return [await _to_out(m, counts.get(m.id, 0), users, venues) for m in found]
+    return [await to_match_out(m, counts.get(m.id, 0), users, venues) for m in found]
 
 
-async def apply(matches: MatchRepository, user: User, match_id: int) -> ParticipationStatus:
+async def apply(
+    matches: MatchRepository, user: User, match_id: int, position: str | None = None
+) -> ParticipationStatus:
     match = await matches.get_match(match_id)
     if match is None:
         raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
+    if position is not None and position not in SPORTS[match.sport].positions:
+        raise _error(422, "UNKNOWN_POSITION", "이 종목에 없는 포지션입니다")
     if match.host_id == user.id:
         raise _error(409, "HOST_CANNOT_APPLY", "내가 연 매치에는 신청할 수 없습니다")
     if match.status is MatchStatus.FULL:
@@ -154,9 +161,11 @@ async def apply(matches: MatchRepository, user: User, match_id: int) -> Particip
         if existing.status is not ParticipationStatus.CANCELED:
             raise _error(409, "ALREADY_APPLIED", "이미 신청한 매치입니다")
         existing.status = ParticipationStatus.APPLIED  # 취소했던 신청은 다시 신청할 수 있다
+        existing.position = position
     else:
         try:
-            await matches.add_participation(match_id, user.id)
+            created = await matches.add_participation(match_id, user.id)
+            created.position = position
         except DuplicateParticipationError:
             raise _error(409, "ALREADY_APPLIED", "이미 신청한 매치입니다") from None
     await matches.commit()
@@ -254,5 +263,19 @@ async def confirm_match(matches: MatchRepository, host: User, match_id: int) -> 
 async def cancel_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
     match = await _transition(matches, host, match_id, MatchStatus.CANCELED)
     match.status = MatchStatus.CANCELED
+    await matches.commit()
+    return match.status
+
+
+async def start_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
+    match = await _transition(matches, host, match_id, MatchStatus.PLAYING)
+    match.status = MatchStatus.PLAYING
+    await matches.commit()
+    return match.status
+
+
+async def complete_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
+    match = await _transition(matches, host, match_id, MatchStatus.COMPLETED)
+    match.status = MatchStatus.COMPLETED
     await matches.commit()
     return match.status

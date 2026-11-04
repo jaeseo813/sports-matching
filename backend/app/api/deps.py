@@ -9,6 +9,9 @@ from app.core.security import TokenError, decode_token
 from app.models.enums import Role
 from app.models.user import User
 from app.repositories.match import MatchRepository, SqlMatchRepository
+from app.repositories.profile import ProfileRepository, SqlProfileRepository
+from app.repositories.recommend import RecommendRepository, SqlRecommendRepository
+from app.repositories.team import SqlTeamRepository, TeamRepository
 from app.repositories.user import SqlUserRepository, UserRepository
 from app.repositories.venue import SqlVenueRepository, VenueRepository
 
@@ -68,3 +71,28 @@ async def get_match_repo(session: Annotated[AsyncSession, Depends(get_session)])
 
 
 MatchRepo = Annotated[MatchRepository, Depends(get_match_repo)]
+
+
+async def get_profile_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProfileRepository:
+    return SqlProfileRepository(session)
+
+
+ProfileRepo = Annotated[ProfileRepository, Depends(get_profile_repo)]
+
+
+async def get_recommend_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RecommendRepository:
+    return SqlRecommendRepository(session)
+
+
+RecommendRepo = Annotated[RecommendRepository, Depends(get_recommend_repo)]
+
+
+async def get_team_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> TeamRepository:
+    return SqlTeamRepository(session)
+
+
+TeamRepo = Annotated[TeamRepository, Depends(get_team_repo)]

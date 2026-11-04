@@ -18,6 +18,7 @@ class MatchCreateIn(BaseModel):
     duration_min: int = Field(ge=30, le=480)
     team_size: int = Field(ge=1, le=11)
     min_players: int | None = Field(default=None, ge=2)
+    position: str | None = Field(default=None, max_length=20)  # 주최자 본인의 포지션
     gender_policy: GenderPolicy = GenderPolicy.ANY
     tier_min: int = Field(default=1, ge=1, le=5)
     tier_max: int = Field(default=5, ge=1, le=5)
@@ -54,3 +55,56 @@ class ParticipationOut(BaseModel):
     id: int
     nickname: str
     status: ParticipationStatus
+
+
+class BreakdownOut(BaseModel):
+    dist: float
+    skill: float
+    time: float
+    host: float
+    fill: float
+
+
+class RecommendedOut(BaseModel):
+    """설명 가능성이 핵심이라 score·breakdown·reasons를 항상 함께 내보낸다."""
+
+    match: MatchOut
+    score: float
+    breakdown: BreakdownOut
+    reasons: list[str]
+
+
+class ApplyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    position: str | None = Field(default=None, max_length=20)  # 희망 포지션 (종목 규칙으로 검증)
+
+
+class TeamMemberOut(BaseModel):
+    nickname: str
+    tier: int  # 티어 배지. 숫자 레이팅은 노출하지 않는다
+    position: str | None
+
+
+class TeamOut(BaseModel):
+    team_no: int
+    members: list[TeamMemberOut]
+
+
+class TeamsOut(BaseModel):
+    teams: list[TeamOut]
+    closeness: int  # 접전도 게이지 1~5
+    is_manual: bool
+
+
+class TeamAssignmentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: int = Field(ge=1)
+    team_no: int = Field(ge=1, le=10)
+
+
+class ManualTeamsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assignments: list[TeamAssignmentIn] = Field(min_length=2, max_length=60)
