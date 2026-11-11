@@ -85,3 +85,15 @@ async def test_my_activity_requires_login_and_shows_only_own(
     assert (await api.get("/api/v1/me/summary", headers=other)).json()["upcoming"] == 0
     res = await api.get("/api/v1/me/summary?user_id=1", headers=other)
     assert res.json()["upcoming"] == 0
+
+
+async def test_sports_and_my_venues_require_login(api: AsyncClient) -> None:
+    for path in ("/api/v1/sports", "/api/v1/me/venues"):
+        assert (await api.get(path)).status_code == 401, path
+
+
+async def test_my_venues_ignores_client_coordinates(api: AsyncClient, venue_id: int) -> None:
+    # 좌표는 등록한 기준점에서만 가져온다. 쿼리로 좌표를 넣어도 쓰지 않는다
+    me = await login(api, 1)
+    res = await api.get("/api/v1/me/venues?lat=37.5&lng=127.0", headers=me)
+    assert res.status_code == 409

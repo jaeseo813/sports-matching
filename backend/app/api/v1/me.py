@@ -13,8 +13,10 @@ from app.schemas.profile import (
     SkillIn,
     SkillOut,
 )
+from app.schemas.venue import VenueOut
 from app.services import matches as match_service
 from app.services import profile as profile_service
+from app.services import venues as venue_service
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -98,3 +100,13 @@ async def my_upcoming_matches(
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> list[MatchOut]:
     return await match_service.my_upcoming(matches, users, venues, user, limit=limit)
+
+
+@router.get("/venues", response_model=list[VenueOut])
+async def venues_near_me(
+    user: CurrentUser,
+    profiles: ProfileRepo,
+    venues: VenueRepo,
+    sport: Annotated[str | None, Query(max_length=20)] = None,
+) -> list[VenueOut]:
+    return await venue_service.venues_near_me(profiles, venues, user.id, sport=sport)

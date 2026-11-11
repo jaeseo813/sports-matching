@@ -49,6 +49,7 @@ class MatchOut(BaseModel):
     tier_max: int
     status: MatchStatus
     my_status: ParticipationStatus | None = None  # 요청자의 신청 상태
+    is_host: bool = False  # 요청자가 주최자인지 (주최자 id는 노출하지 않는다)
 
 
 class MySummaryOut(BaseModel):
