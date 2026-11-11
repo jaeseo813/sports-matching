@@ -20,6 +20,8 @@ export interface MatchOut {
   tier_max: number;
   status: "open" | "full" | "confirmed" | "playing" | "completed" | "canceled";
   my_status: ParticipationStatus | null;
+  is_host: boolean;
+  gender_policy: GenderPolicy;
 }
 
 export interface RecommendedOut {
@@ -42,3 +44,33 @@ export interface SkillOut {
   positions: string[] | null;
   trend: "up" | "same" | "down";
 }
+
+export interface SportOut {
+  id: string;
+  name: string;
+  team_count: number;
+  players_per_team: number[];
+  positions: string[];
+  tier_labels: Record<string, string>; // "1"~"5"
+}
+
+export interface VenueOut {
+  id: number;
+  name: string;
+  sports: string[];
+  distance_km: number | null;
+}
+
+export interface ParticipationOut {
+  id: number;
+  nickname: string;
+  status: ParticipationStatus;
+}
+
+export interface LocationOut {
+  slot: number;
+  label: string;
+  max_distance_km: number;
+}
+
+export type GenderPolicy = "any" | "male_only" | "female_only";

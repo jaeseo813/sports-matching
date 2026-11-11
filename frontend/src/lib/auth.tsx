@@ -21,6 +21,7 @@ export interface SignupInput {
 interface AuthState {
   user: User | null;
   loading: boolean; // 새로고침 직후 저장된 refresh로 세션을 복구하는 중
+  signedOut: boolean; // 방금 직접 로그아웃했다 (로그인 화면이 아니라 시작 화면으로 보낸다)
   login: (email: string, password: string) => Promise<void>;
   signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
   const [loading, setLoading] = useState(() => getStoredRefresh() !== null);
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setTokens(await post<Tokens>("/auth/login", { email, password }, { auth: false }));
     setUser(await api<User>("/auth/me"));
+    setSignedOut(false);
   }, []);
 
   const signup = useCallback(
@@ -68,11 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     const refresh = getStoredRefresh();
     setTokens(null);
+    setSignedOut(true);
     setUser(null);
     if (refresh) await post("/auth/logout", { refresh_token: refresh }, { auth: false }).catch(() => undefined);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, signup, logout }), [user, loading, login, signup, logout]);
+  const value = useMemo(() => ({ user, loading, signedOut, login, signup, logout }), [user, loading, signedOut, login, signup, logout]);
   return <AuthContext value={value}>{children}</AuthContext>;
 }
 

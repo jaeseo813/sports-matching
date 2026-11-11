@@ -1,22 +1,9 @@
-import { X } from "lucide-react";
-import { useRef, useState } from "react";
-import MatchCard from "../../components/MatchCard";
+import MatchList from "../../components/MatchList";
 import { badminton } from ".";
-import { faq, formats, matches, tiers } from "./data";
-
-type Match = (typeof matches)[number];
+import { faq, formats, tiers } from "./data";
 
 // 배드민턴 담당 영역: 이 폴더(src/sports/badminton) 안에서만 작업한다.
 export default function Page() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const [selected, setSelected] = useState<Match | null>(null);
-
-  const open = (m: Match) => {
-    setSelected(m);
-    dialogRef.current?.showModal();
-  };
-  const close = () => dialogRef.current?.close();
-
   return (
     <div className="space-y-10">
       <section className={`rounded-xl p-6 md:p-8 ${badminton.bg} ${badminton.fg}`}>
@@ -59,14 +46,7 @@ export default function Page() {
 
       <section aria-labelledby="matches">
         <h2 id="matches" className="mb-3 text-xl font-extrabold">모집 중인 배드민턴 매치</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {matches.map((m) => (
-            <div key={m.id} className="lift relative">
-              <MatchCard sport={badminton} {...m} />
-              <button type="button" onClick={() => open(m)} aria-label={`${m.title} 상세 보기`} className="absolute inset-0 rounded-xl" />
-            </div>
-          ))}
-        </div>
+        <MatchList sport="badminton" />
       </section>
 
       <section aria-labelledby="faq">
@@ -81,47 +61,6 @@ export default function Page() {
         </div>
         <p className="mt-2 text-xs text-muted">방장이 정한 규칙이 있으면 그쪽이 우선이에요.</p>
       </section>
-      <dialog
-        ref={dialogRef}
-        onClose={() => setSelected(null)}
-        onClick={(e) => e.target === dialogRef.current && close()}
-        aria-labelledby="match-title"
-        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 text-night backdrop:bg-night/50"
-      >
-        {selected && (
-          <div className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              <h2 id="match-title" className="text-xl font-black">{selected.title}</h2>
-              <button type="button" onClick={close} aria-label="닫기" className="flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-edge">
-                <X size={20} aria-hidden="true" />
-              </button>
-            </div>
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex gap-3"><dt className="w-16 shrink-0 text-muted">장소</dt><dd>{selected.venue}, {selected.distance}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 shrink-0 text-muted">시간</dt><dd>{selected.when}</dd></div>
-              <div className="flex gap-3"><dt className="w-16 shrink-0 text-muted">형식</dt><dd>{selected.capacity === 2 ? "단식 1:1" : "복식 2:2"} · {selected.joined}/{selected.capacity}명</dd></div>
-              <div className="flex gap-3">
-                <dt className="w-16 shrink-0 text-muted">참가 단계</dt>
-                <dd>
-                  {tiers.filter((t) => t.tier >= selected.tierRange[0] && t.tier <= selected.tierRange[1]).map((t) => (
-                    <span key={t.tier} className="block">{t.tier}단계 · {t.label}</span>
-                  ))}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-4 rounded-lg bg-cream p-3 text-sm">{selected.description}</p>
-            <ul className="mt-3 flex flex-wrap gap-1.5">
-              {selected.reasons.map((r) => (
-                <li key={r} className="rounded-lg bg-lime px-2.5 py-1 text-xs font-semibold">{r}</li>
-              ))}
-            </ul>
-            {/* TODO: 신청 API 연동 */}
-            <button type="button" disabled className="mt-5 min-h-12 w-full rounded-lg bg-night font-bold text-lime disabled:opacity-50">
-              신청하기 (준비 중)
-            </button>
-          </div>
-        )}
-      </dialog>
     </div>
   );
 }

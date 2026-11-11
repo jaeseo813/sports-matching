@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 import { ArrowRight } from "lucide-react";
 import MatchCard from "../components/MatchCard";
 import { football } from "../sports/football";
@@ -47,6 +48,7 @@ function HeroPanel() {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   return (
     <div className="min-h-dvh bg-white">
       <header className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -54,12 +56,20 @@ export default function Home() {
           Team<span className="rounded-md bg-lime px-1">Up</span>
         </span>
         <div className="flex items-center gap-1">
-          <Link to="/dashboard" className="flex min-h-11 items-center rounded-lg px-4 text-sm font-bold text-muted hover:bg-edge">
-            로그인
-          </Link>
-          <Link to="/dashboard" className="flex min-h-11 items-center rounded-lg bg-night px-5 text-sm font-bold text-lime hover:opacity-90">
-            시작하기
-          </Link>
+          {user ? (
+            <Link to="/dashboard" className="flex min-h-11 items-center rounded-lg bg-night px-5 text-sm font-bold text-lime hover:opacity-90">
+              {user.nickname}님의 대시보드
+            </Link>
+          ) : (
+            <>
+              <Link to="/login" className="flex min-h-11 items-center rounded-lg px-4 text-sm font-bold text-muted hover:bg-edge">
+                로그인
+              </Link>
+              <Link to="/signup" className="flex min-h-11 items-center rounded-lg bg-night px-5 text-sm font-bold text-lime hover:opacity-90">
+                시작하기
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -77,7 +87,7 @@ export default function Home() {
               가까운 곳에서 실력이 비슷한 사람들과 팀을 이뤄요. 농구, 축구/풋살, 배드민턴을 지원해요.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/dashboard" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-night px-7 font-bold text-lime hover:opacity-90 active:scale-[0.98]">
+              <Link to="/matches" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-night px-7 font-bold text-lime hover:opacity-90 active:scale-[0.98]">
                 매치 찾기 <ArrowRight size={18} aria-hidden="true" />
               </Link>
               <a href="#why" className="inline-flex min-h-12 items-center rounded-lg border border-edge bg-white px-7 font-bold hover:bg-edge">
@@ -161,7 +171,7 @@ export default function Home() {
         <section className="mx-auto max-w-6xl px-4 pb-16">
           <div className="flex flex-col items-start justify-between gap-6 rounded-xl bg-lime p-8 md:flex-row md:items-center md:p-12">
             <h2 className="text-3xl font-black md:text-4xl">이번 주말, 한 경기 뛰어봐요</h2>
-            <Link to="/dashboard" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-night px-8 font-bold text-lime hover:opacity-90 active:scale-[0.98]">
+            <Link to="/matches" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-night px-8 font-bold text-lime hover:opacity-90 active:scale-[0.98]">
               매치 찾기 <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>

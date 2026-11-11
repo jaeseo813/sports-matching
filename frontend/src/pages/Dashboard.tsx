@@ -68,6 +68,7 @@ function Card({ m, reasons }: { m: MatchOut; reasons?: string[] }) {
   const sport = sportOf(m.sport);
   if (!sport) return null;
   return (
+    <Link to={`/matches/${m.id}`} className="block rounded-xl" aria-label={`${m.title} 상세 보기`}>
     <MatchCard
       sport={sport}
       title={m.title}
@@ -78,11 +79,12 @@ function Card({ m, reasons }: { m: MatchOut; reasons?: string[] }) {
       tierRange={[m.tier_min, m.tier_max]}
       reasons={reasons}
     />
+    </Link>
   );
 }
 
 export default function Dashboard() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const { data, error } = useActivity(!!user);
 
   const stats = data && [
@@ -113,12 +115,6 @@ export default function Dashboard() {
         <SportPicker />
       </section>
 
-      {!loading && !user && (
-        <Empty>
-          <Link to="/login" className="font-bold text-night underline">로그인</Link>하면 내 활동 기록과 추천 매치가 보여요.
-        </Empty>
-      )}
-
       {user && error && <Empty>활동 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</Empty>}
 
       {user && !error && (
@@ -143,7 +139,11 @@ export default function Dashboard() {
 
           <section aria-labelledby="upcoming" aria-busy={!data}>
             <h2 id="upcoming" className="mb-4 text-xl font-extrabold">참가 예정 매치</h2>
-            {data && data.upcoming.length === 0 && <Empty>참가 예정인 매치가 없어요. 종목을 골라 매치를 찾아보세요.</Empty>}
+            {data && data.upcoming.length === 0 && (
+              <Empty>
+                참가 예정인 매치가 없어요. <Link to="/matches" className="font-bold text-night underline">매치 찾기</Link>
+              </Empty>
+            )}
             <ul className="grid gap-4 md:grid-cols-2">
               {data?.upcoming.map((m) => (
                 <li key={m.id} className="lift">
@@ -158,7 +158,12 @@ export default function Dashboard() {
               <h2 id="recommended" className="text-xl font-extrabold">나를 위한 추천</h2>
               <Link to="/matches" className="flex min-h-11 items-center text-sm font-bold underline underline-offset-4">더 보기</Link>
             </div>
-            {data?.needsOnboarding && <Empty>종목 자기평가와 활동 지역을 등록하면 가까운 곳의 비슷한 실력 매치를 추천해 드려요.</Empty>}
+            {data?.needsOnboarding && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-edge bg-white p-5 text-sm text-muted">
+                <span>종목·실력·활동 지역을 등록하면 가까운 곳의 비슷한 실력 매치를 추천해 드려요.</span>
+                <Link to="/onboarding" className="flex min-h-11 items-center rounded-lg bg-night px-4 font-bold text-lime">설정하기</Link>
+              </div>
+            )}
             {data && !data.needsOnboarding && data.recommended.length === 0 && <Empty>지금 조건에 맞는 매치가 없어요.</Empty>}
             <ul className="grid gap-4 md:grid-cols-3">
               {data?.recommended.map((r) => (

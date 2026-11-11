@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import Field from "../components/Field";
 import { ApiError } from "../lib/api/client";
 import { useAuth, type Gender } from "../lib/auth";
@@ -12,14 +12,14 @@ const genders: { value: Gender; label: string }[] = [
 
 export default function Signup() {
   const { user, signup } = useAuth();
-  const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "", nickname: "", birthYear: "" });
   const [gender, setGender] = useState<Gender>("male");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false); // 방금 가입했으면 온보딩으로 보낸다
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user && !busy) return <Navigate to={done ? "/onboarding" : "/dashboard"} replace />;
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
 
@@ -36,7 +36,7 @@ export default function Signup() {
         gender,
         birth_year: Number(form.birthYear),
       });
-      navigate("/dashboard", { replace: true });
+      setDone(true);
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fields);
