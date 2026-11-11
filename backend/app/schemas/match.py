@@ -51,6 +51,14 @@ class MatchOut(BaseModel):
     my_status: ParticipationStatus | None = None  # 요청자의 신청 상태
 
 
+class MySummaryOut(BaseModel):
+    """대시보드 활동 요약. 숫자 레이팅은 싣지 않고 매너 점수만 한 자리로 반올림해 준다."""
+
+    upcoming: int  # 참가 예정(수락됨, 시작 전)
+    attended: int  # 참가 완료(출석 처리됨)
+    manner_score: float
+
+
 class ParticipationOut(BaseModel):
     id: int
     nickname: str

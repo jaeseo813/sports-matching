@@ -8,7 +8,7 @@ from app.models.user import User
 from app.repositories.match import DuplicateParticipationError, MatchRepository
 from app.repositories.user import UserRepository
 from app.repositories.venue import VenueRepository
-from app.schemas.match import MatchCreateIn, MatchOut, ParticipationOut
+from app.schemas.match import MatchCreateIn, MatchOut, MySummaryOut, ParticipationOut
 from app.services.match_state import can_transition, status_after_headcount
 from app.sports.registry import SPORTS
 
@@ -138,6 +138,31 @@ async def list_matches(
     found = await matches.list_open(sport=sport, limit=min(limit, MAX_PAGE), offset=offset)
     counts = await matches.accepted_counts([m.id for m in found])
     return [await to_match_out(m, counts.get(m.id, 0), users, venues) for m in found]
+
+
+async def my_upcoming(
+    matches: MatchRepository,
+    users: UserRepository,
+    venues: VenueRepository,
+    user: User,
+    *,
+    limit: int,
+) -> list[MatchOut]:
+    # 조회 대상은 항상 요청자 본인(JWT)이다. 사용자 id를 입력으로 받지 않는다
+    found = await matches.list_upcoming_for_user(user.id, limit=min(limit, MAX_PAGE))
+    counts = await matches.accepted_counts([m.id for m in found])
+    return [
+        await to_match_out(m, counts.get(m.id, 0), users, venues, ParticipationStatus.ACCEPTED)
+        for m in found
+    ]
+
+
+async def my_summary(matches: MatchRepository, user: User) -> MySummaryOut:
+    return MySummaryOut(
+        upcoming=await matches.count_upcoming_for_user(user.id),
+        attended=await matches.count_attended(user.id),
+        manner_score=round(user.manner_score, 1),
+    )
 
 
 async def apply(

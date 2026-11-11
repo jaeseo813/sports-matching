@@ -71,3 +71,17 @@ async def test_response_exposes_no_pii(api: AsyncClient, venue_id: int) -> None:
     mid = await make_match(api, host, venue_id)
     text = (await api.get(f"/api/v1/matches/{mid}", headers=host)).text
     assert "example.com" not in text and "birth" not in text and "host_id" not in text
+
+
+async def test_my_activity_requires_login_and_shows_only_own(
+    api: AsyncClient, venue_id: int
+) -> None:
+    for path in ("/api/v1/me/summary", "/api/v1/me/matches"):
+        assert (await api.get(path)).status_code == 401, path
+    owner, other = await login(api, 1), await login(api, 2)
+    await make_match(api, owner, venue_id)
+    # 남의 매치는 내 예정 목록·요약에 보이지 않고, 사용자 id를 지정하는 파라미터도 없다
+    assert (await api.get("/api/v1/me/matches", headers=other)).json() == []
+    assert (await api.get("/api/v1/me/summary", headers=other)).json()["upcoming"] == 0
+    res = await api.get("/api/v1/me/summary?user_id=1", headers=other)
+    assert res.json()["upcoming"] == 0
