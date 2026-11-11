@@ -14,7 +14,7 @@
 | 레이팅(상호 평가) | 완료 | Glicko-2 변형, 논문 예제로 검증 |
 | 팀 밸런서 | 완료 | 2팀 기준 |
 | 종목 규칙·FAQ(백엔드) | 풋살·배드민턴 완료, 농구 진행 중 | 농구는 `Jason` 브랜치(PR 전), `RULES` 미완 |
-| 프론트 | 배드민턴·풋살 페이지, 종목 선택 완료, 나머지 mock | API 연결 전, 농구 페이지는 `Jason` 브랜치(PR 전) |
+| 프론트 | 가입·로그인, 대시보드 API 연결 완료. 배드민턴·풋살 페이지, 종목 선택 완료 | 종목 페이지 매치는 mock, 농구 페이지는 `Jason` 브랜치(PR 전) |
 | 챗봇 | 미착수 | |
 | 보안 진단·방어(Red/Blue) | 미착수 | 회귀 테스트 일부는 이미 있음 |
 
@@ -47,6 +47,7 @@
 | 진행 | `POST /matches/{id}/confirm·start·complete·cancel` | 주최자 |
 | 팀 | `POST .../teams/balance`, `GET .../teams`, `PUT .../teams` | 분배·수정은 주최자, 조회는 참가자 |
 | 평가 | `PUT .../attendance`(주최자), `POST .../reviews`(참가자), `POST .../rate`(주최자, 1회) | |
+| 내 활동 | `GET /me/summary`(참가 예정·완료 수, 매너 점수), `GET /me/matches`(참가 예정 매치) | 로그인, 항상 본인만 |
 
 ### 동작 규칙 요약
 - **정원**은 서버가 계산한다(종목 규칙의 팀 수 × `team_size`). 주최자는 개설 시 수락된 참가자로 자동 등록되어 정원에 포함된다.
@@ -61,10 +62,14 @@
 - 공통: `SportPicker`(대시보드·매치 페이지), `AppLayout` 위쪽 여백, `MatchCard`의 참가 단계 표시.
 - 풋살 종목 페이지(`sports/football/`): 배드민턴과 같은 구성에 5:5·6:6 필터와 소개 영역(경기장 라인)이 추가됐다. 매치는 mock(`data.ts`). 종목 표시 이름은 "풋살".
 - 농구 페이지(`sports/basketball/`)는 `main`에는 아직 "준비 중" 화면이다. 팀원(darelljay)이 `origin/Jason` 브랜치(2026-11-08, 커밋 2개)에 작성했고 **PR은 아직 없다**. 인원 구성(3:3·5:5), 포지션 5개, 티어 1~5, mock 매치 3개, FAQ 6개를 담았다. `main`과 충돌 없음(병합 시뮬레이션으로 확인).
-- **없는 것**: 로그인·가입 화면, 토큰 저장, API 클라이언트(`lib/api`), TanStack Query, 온보딩 화면.
+- API 클라이언트(`lib/api/client.ts`): access 토큰은 메모리, refresh 토큰은 localStorage(`teamup.refresh`). 401이면 refresh를 한 번만 하고 재시도한다. 오류는 `ApiError(code, message, fields)`로 바꾼다.
+- 인증(`lib/auth.tsx`, `/login`, `/signup`): 가입 후 자동 로그인, 새로고침 시 세션 복구, 로그아웃 시 서버 refresh 무효화. 헤더에 닉네임·로그아웃.
+- 대시보드: 활동 요약·참가 예정 매치·추천(등록한 종목별 추천을 점수순으로 상위 3개)을 실제 API로 보여준다. 비로그인·온보딩 전·빈 목록 상태 문구가 있다.
+- **없는 것**: 온보딩 화면, 매치 개설·신청 화면, TanStack Query(`pnpm`이 없어 의존성 추가를 미룸, 지금은 `useEffect`로 불러온다).
+- refresh 토큰을 localStorage에 두는 것은 XSS 시 탈취될 수 있다. 위협 모델에 기록하고 Red 단계 소재로 쓴다.
 
 ## 테스트·검증
-- pytest 221개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음).
+- pytest 225개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음).
 - DB가 필요한 테스트는 실제 MariaDB를 쓰고 항상 롤백한다. DB에 연결할 수 없으면 건너뛴다(컨테이너가 꺼져 있으면 조용히 건너뛰므로 `docker compose up -d db` 후 확인할 것).
 - 보안 회귀 테스트: `tests/security/`
   - 인증: `alg=none` 위조, 잘못된 서명, refresh 토큰의 access 사용, refresh 재사용 시 family 폐기, 로그인 레이트리밋
@@ -99,11 +104,11 @@
 - 풋살·배드민턴 mock 매치의 날짜가 고정 문자열이라 API 연동 전에는 지난 날짜로 보인다.
 
 ### 프론트 연결 (다음 작업)
-1. `lib/api` 클라이언트(access 토큰 첨부, 401 시 refresh), TanStack Query 도입
-2. 가입·로그인 화면과 토큰 저장
+1. ~~`lib/api` 클라이언트(access 토큰 첨부, 401 시 refresh)~~ 완료. TanStack Query 도입은 남음
+2. ~~가입·로그인 화면과 토큰 저장~~ 완료
 3. 온보딩 3단계(종목 / 자기평가 / 활동 지역+거리) → `PUT /me/skills`, `PUT /me/locations`
 4. 배드민턴·풋살 페이지의 mock을 `GET /matches`, `GET /matches/{id}`, `POST /matches/{id}/apply`로 교체
-5. 대시보드 추천을 `GET /matches/recommended`로 교체, 추천 이유 칩과 breakdown 표시
+5. ~~대시보드 추천을 `GET /matches/recommended`로 교체, 추천 이유 칩~~ 완료. breakdown 표시는 남음
 6. 매치 개설, 신청자 승인, 팀 구성, 리뷰 제출 화면
 - 상세 화면은 지금 모달이다. "피드 → 상세 → 신청 3탭" 원칙에 맞게 별도 페이지로 옮길지 정해야 한다.
 - 로컬 개발 서버(Vite)는 `pnpm`이 없어서 `npx vite`로 띄웠다. 프론트 `lint`·`test` 스크립트도 아직 없다.
