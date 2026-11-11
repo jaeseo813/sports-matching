@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 
+from app.repositories.profile import ProfileRepository
 from app.repositories.venue import VenueRepository, VenueRow
 from app.schemas.venue import VenueCreateIn, VenueOut
 from app.services.geo import bounding_box
@@ -61,3 +62,29 @@ async def nearby_venues(
         sport=sport,
     )
     return [to_out(r) for r in rows]
+
+
+async def venues_near_me(
+    profiles: ProfileRepository, repo: VenueRepository, user_id: int, *, sport: str | None
+) -> list[VenueOut]:
+    """등록한 활동 기준점 주변 구장. 좌표는 서버에서만 쓰고 클라이언트에서 받지 않는다."""
+    if sport is not None:
+        check_sport(sport)
+    locations = await profiles.list_locations(user_id)
+    if not locations:
+        raise _error(409, "LOCATION_NOT_SET", "먼저 활동 기준점을 등록해 주세요")
+    best: dict[int, VenueRow] = {}
+    for loc in locations:
+        lng, lat = loc.point  # POINT(lng, lat)
+        radius_km = float(loc.max_distance_km)
+        for row in await repo.nearby(
+            lat=lat,
+            lng=lng,
+            radius_m=radius_km * 1000,
+            bbox=bounding_box(lat, lng, radius_km),
+            sport=sport,
+        ):
+            prev = best.get(row.id)
+            if prev is None or (row.distance_m or 0) < (prev.distance_m or 0):
+                best[row.id] = row  # 기준점이 여러 개면 가장 가까운 거리로
+    return [to_out(r) for r in sorted(best.values(), key=lambda r: (r.distance_m or 0, r.id))]

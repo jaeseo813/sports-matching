@@ -45,7 +45,7 @@ async def create_match(
 
 @router.get("", response_model=list[MatchOut])
 async def list_matches(
-    _: CurrentUser,
+    user: CurrentUser,
     matches: MatchRepo,
     users: UserRepo,
     venues: VenueRepo,
@@ -54,7 +54,7 @@ async def list_matches(
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> list[MatchOut]:
     return await match_service.list_matches(
-        matches, users, venues, sport=sport, limit=limit, offset=offset
+        matches, users, venues, sport=sport, limit=limit, offset=offset, viewer_id=user.id
     )
 
 

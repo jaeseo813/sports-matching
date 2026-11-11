@@ -37,10 +37,3 @@ export const faq = [
     a: "선에 닿은 공은 인으로 봐요.",
   },
 ];
-
-// TODO: 예시 데이터(mock). API 연동 시 교체
-export const matches = [
-  { id: 1, title: "평일 저녁 복식", venue: "새솔 실내체육관", when: "10/13(화) 19:30", distance: "약 4km", joined: 3, capacity: 4, tierRange: [2, 3] as [number, number], reasons: ["실력대 비슷", "선호 시간대"], description: "퇴근하고 가볍게 치는 복식이에요. 셔틀콕은 제가 챙겨 갈게요." },
-  { id: 2, title: "토요일 오후 복식", venue: "누리 체육관", when: "10/10(토) 14:00", distance: "약 1km", joined: 2, capacity: 4, tierRange: [3, 4] as [number, number], reasons: ["집에서 약 1km", "실력대 비슷"], description: "2게임씩 파트너를 바꿔 가며 쳐요. 라켓이 없으면 빌려 드려요." },
-  { id: 3, title: "일요일 아침 단식", venue: "다온 체육관", when: "10/11(일) 09:00", distance: "약 3km", joined: 1, capacity: 2, tierRange: [1, 2] as [number, number], reasons: ["집에서 약 3km"], description: "아침 운동 삼아 1:1로 랠리 위주로 쳐요." },
-];
