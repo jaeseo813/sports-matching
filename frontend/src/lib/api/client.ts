@@ -51,9 +51,10 @@ async function toError(res: Response): Promise<ApiError> {
   const detail = (body as { detail?: unknown } | null)?.detail;
   if (Array.isArray(detail)) {
     const fields: Record<string, string> = {};
-    for (const d of detail as { loc?: unknown[]; msg?: string }[]) {
+    for (const d of detail as { loc?: unknown[] }[]) {
       const name = String(d.loc?.[d.loc.length - 1] ?? "");
-      if (name && !fields[name]) fields[name] = d.msg ?? "값을 확인해 주세요";
+      // 서버 메시지는 영어 정규식 원문이라 그대로 보여주지 않는다. 제약은 라벨에 적는다
+      if (name && !fields[name]) fields[name] = "값을 확인해 주세요";
     }
     return new ApiError(res.status, "VALIDATION_ERROR", "입력값을 확인해 주세요", fields);
   }
