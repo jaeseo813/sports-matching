@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { CalendarCheck, Settings, Star, Users } from "lucide-react";
 import MatchCard from "../components/MatchCard";
 import SportPicker from "../components/SportPicker";
+import { useAuth } from "../lib/auth";
 import { sports } from "../sports/registry";
 
 // TODO: 예시 데이터(mock). API 연동 시 교체
@@ -22,17 +23,21 @@ const recommended = [
   { id: 5, sport: "badminton", title: "토요일 오후 복식", venue: "누리 체육관", when: "10/10(토) 14:00", reasons: ["집에서 약 1km", "실력대 비슷"] },
 ];
 
+// API 연동 전까지 가짜 숫자·매치를 실제 기록으로 오해하지 않게 표시한다
+const Sample = () => <span className="rounded-md bg-edge px-2 py-0.5 align-middle text-xs font-bold text-muted">예시 데이터</span>;
+
 const sportOf = (id: string) => sports.find((s) => s.id === id)!;
 
 export default function Dashboard() {
+  const { user } = useAuth();
   return (
     <>
       {/* 인사 블록 */}
       <section className="rounded-xl bg-lime p-6 md:p-8">
         <div className="mx-auto flex max-w-6xl items-start justify-between">
           <div>
-            <p className="text-sm">다시 만나서 반가워요</p>
-            <h1 className="mt-1 text-2xl font-black md:text-4xl">이번 주 경기 2개가 예정되어 있어요</h1>
+            <p className="text-sm">{user ? `${user.nickname}님, 반가워요` : "TeamUp에 오신 걸 환영해요"}</p>
+            <h1 className="mt-1 text-2xl font-black md:text-4xl">함께 뛸 사람을 찾아볼까요?</h1>
           </div>
           <Link to="/me" aria-label="설정" className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-night text-lime">
             <Settings size={20} aria-hidden="true" />
@@ -47,7 +52,7 @@ export default function Dashboard() {
 
       {/* 큰 아이콘 버튼 형태의 활동 요약 */}
       <section aria-labelledby="summary" className="!mt-8">
-        <h2 id="summary" className="mb-4 text-xl font-extrabold">내 활동 기록</h2>
+        <h2 id="summary" className="mb-4 text-xl font-extrabold">내 활동 기록{" "}<Sample /></h2>
         <ul className="grid grid-cols-3 gap-3 md:max-w-2xl">
           {stats.map(({ label, value, icon: Icon }) => (
             <li key={label} className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl bg-night text-center text-white">
@@ -62,7 +67,7 @@ export default function Dashboard() {
       </section>
 
       <section aria-labelledby="upcoming">
-        <h2 id="upcoming" className="mb-4 text-xl font-extrabold">참가 예정 매치</h2>
+        <h2 id="upcoming" className="mb-4 text-xl font-extrabold">참가 예정 매치{" "}<Sample /></h2>
         <ul className="grid gap-4 md:grid-cols-2">
           {upcoming.map(({ id, sport, ...m }) => (
             <li key={id} className="lift">
@@ -74,7 +79,7 @@ export default function Dashboard() {
 
       <section aria-labelledby="recommended">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="recommended" className="text-xl font-extrabold">나를 위한 추천</h2>
+          <h2 id="recommended" className="text-xl font-extrabold">나를 위한 추천{" "}<Sample /></h2>
           <Link to="/matches" className="flex min-h-11 items-center text-sm font-bold underline underline-offset-4">더 보기</Link>
         </div>
         <ul className="grid gap-4 md:grid-cols-3">
