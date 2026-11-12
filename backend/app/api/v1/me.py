@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Response
+from fastapi import APIRouter, Path, Query, Response
 
-from app.api.deps import CurrentUser, ProfileRepo
+from app.api.deps import CurrentUser, MatchRepo, ProfileRepo, UserRepo, VenueRepo
+from app.schemas.match import MatchOut, MySummaryOut
 from app.schemas.profile import (
     BlockOut,
     LocationIn,
@@ -12,7 +13,10 @@ from app.schemas.profile import (
     SkillIn,
     SkillOut,
 )
+from app.schemas.venue import VenueOut
+from app.services import matches as match_service
 from app.services import profile as profile_service
+from app.services import venues as venue_service
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -80,3 +84,29 @@ async def unblock(
 ) -> Response:
     await profile_service.unblock(repo, user, user_id)
     return Response(status_code=204)
+
+
+@router.get("/summary", response_model=MySummaryOut)
+async def my_summary(user: CurrentUser, matches: MatchRepo) -> MySummaryOut:
+    return await match_service.my_summary(matches, user)
+
+
+@router.get("/matches", response_model=list[MatchOut])
+async def my_upcoming_matches(
+    user: CurrentUser,
+    matches: MatchRepo,
+    users: UserRepo,
+    venues: VenueRepo,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[MatchOut]:
+    return await match_service.my_upcoming(matches, users, venues, user, limit=limit)
+
+
+@router.get("/venues", response_model=list[VenueOut])
+async def venues_near_me(
+    user: CurrentUser,
+    profiles: ProfileRepo,
+    venues: VenueRepo,
+    sport: Annotated[str | None, Query(max_length=20)] = None,
+) -> list[VenueOut]:
+    return await venue_service.venues_near_me(profiles, venues, user.id, sport=sport)

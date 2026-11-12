@@ -8,7 +8,7 @@ from app.models.user import User
 from app.repositories.match import DuplicateParticipationError, MatchRepository
 from app.repositories.user import UserRepository
 from app.repositories.venue import VenueRepository
-from app.schemas.match import MatchCreateIn, MatchOut, ParticipationOut
+from app.schemas.match import MatchCreateIn, MatchOut, MySummaryOut, ParticipationOut
 from app.services.match_state import can_transition, status_after_headcount
 from app.sports.registry import SPORTS
 
@@ -37,6 +37,7 @@ async def to_match_out(
     users: UserRepository,
     venues: VenueRepository,
     my_status: ParticipationStatus | None = None,
+    viewer_id: int | None = None,
 ) -> MatchOut:
     host = await users.get_by_id(match.host_id)
     venue = await venues.get(match.venue_id)
@@ -59,6 +60,7 @@ async def to_match_out(
         tier_max=match.tier_max,
         status=match.status,
         my_status=my_status,
+        is_host=viewer_id is not None and match.host_id == viewer_id,
     )
 
 
@@ -106,7 +108,7 @@ async def create_match(
     host_part.status = ParticipationStatus.ACCEPTED
     host_part.position = data.position
     await matches.commit()
-    return await to_match_out(match, 1, users, venues)
+    return await to_match_out(match, 1, users, venues, ParticipationStatus.ACCEPTED, host.id)
 
 
 async def get_match(
@@ -121,7 +123,9 @@ async def get_match(
         raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
     part = await matches.get_participation(match_id, viewer.id)
     joined = await matches.count_accepted(match_id)
-    return await to_match_out(match, joined, users, venues, part.status if part else None)
+    return await to_match_out(
+        match, joined, users, venues, part.status if part else None, viewer.id
+    )
 
 
 async def list_matches(
@@ -132,12 +136,43 @@ async def list_matches(
     sport: str | None,
     limit: int,
     offset: int,
+    viewer_id: int | None = None,
 ) -> list[MatchOut]:
     if sport is not None and sport not in SPORTS:
         raise _error(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다")
     found = await matches.list_open(sport=sport, limit=min(limit, MAX_PAGE), offset=offset)
     counts = await matches.accepted_counts([m.id for m in found])
-    return [await to_match_out(m, counts.get(m.id, 0), users, venues) for m in found]
+    return [
+        await to_match_out(m, counts.get(m.id, 0), users, venues, viewer_id=viewer_id)
+        for m in found
+    ]
+
+
+async def my_upcoming(
+    matches: MatchRepository,
+    users: UserRepository,
+    venues: VenueRepository,
+    user: User,
+    *,
+    limit: int,
+) -> list[MatchOut]:
+    # 조회 대상은 항상 요청자 본인(JWT)이다. 사용자 id를 입력으로 받지 않는다
+    found = await matches.list_upcoming_for_user(user.id, limit=min(limit, MAX_PAGE))
+    counts = await matches.accepted_counts([m.id for m in found])
+    return [
+        await to_match_out(
+            m, counts.get(m.id, 0), users, venues, ParticipationStatus.ACCEPTED, user.id
+        )
+        for m in found
+    ]
+
+
+async def my_summary(matches: MatchRepository, user: User) -> MySummaryOut:
+    return MySummaryOut(
+        upcoming=await matches.count_upcoming_for_user(user.id),
+        attended=await matches.count_attended(user.id),
+        manner_score=round(user.manner_score, 1),
+    )
 
 
 async def apply(

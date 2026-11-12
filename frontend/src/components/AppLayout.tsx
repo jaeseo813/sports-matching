@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { CalendarDays, LayoutDashboard, User } from "lucide-react";
+import { useAuth } from "../lib/auth";
 
 const tabs = [
   { to: "/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -9,6 +10,7 @@ const tabs = [
 
 // 데스크톱: 상단 내비게이션 / 모바일: 하단 탭바
 export default function AppLayout() {
+  const { user, loading, logout } = useAuth();
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-edge bg-white/90 backdrop-blur">
@@ -31,6 +33,19 @@ export default function AppLayout() {
               </NavLink>
             ))}
           </nav>
+          {!loading &&
+            (user ? (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="hidden font-bold sm:inline">{user.nickname}</span>
+                <button type="button" onClick={() => void logout()} className="min-h-11 rounded-lg border border-edge px-4 font-bold hover:bg-edge">
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="flex min-h-11 items-center rounded-lg bg-night px-5 text-sm font-bold text-lime hover:opacity-90">
+                로그인
+              </Link>
+            ))}
         </div>
       </header>
 

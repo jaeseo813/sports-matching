@@ -42,7 +42,14 @@ class MatchRepository(Protocol):
     ) -> Participation | None: ...
     async def add_participation(self, match_id: int, user_id: int) -> Participation: ...
     async def list_participations(self, match_id: int) -> list[tuple[Participation, str]]: ...
+    async def list_upcoming_for_user(self, user_id: int, *, limit: int) -> list[Match]: ...
+    async def count_upcoming_for_user(self, user_id: int) -> int: ...
+    async def count_attended(self, user_id: int) -> int: ...
     async def commit(self) -> None: ...
+
+
+# 내가 참가할 예정인 매치: 수락된 신청이 있고 아직 시작 전/확정 단계인 매치
+_UPCOMING = (MatchStatus.OPEN, MatchStatus.FULL, MatchStatus.CONFIRMED)
 
 
 class SqlMatchRepository:
@@ -152,6 +159,40 @@ class SqlMatchRepository:
             .order_by(Participation.id)
         )
         return [(p, nick) for p, nick in (await self._session.execute(stmt)).all()]
+
+    async def list_upcoming_for_user(self, user_id: int, *, limit: int) -> list[Match]:
+        stmt = (
+            select(Match)
+            .join(Participation, Participation.match_id == Match.id)
+            .where(
+                Participation.user_id == user_id,
+                Participation.status == ParticipationStatus.ACCEPTED,
+                Match.status.in_(_UPCOMING),
+            )
+            .order_by(Match.starts_at, Match.id)
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars())
+
+    async def count_upcoming_for_user(self, user_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Participation)
+            .join(Match, Match.id == Participation.match_id)
+            .where(
+                Participation.user_id == user_id,
+                Participation.status == ParticipationStatus.ACCEPTED,
+                Match.status.in_(_UPCOMING),
+            )
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
+
+    async def count_attended(self, user_id: int) -> int:
+        stmt = select(func.count()).where(
+            Participation.user_id == user_id,
+            Participation.status == ParticipationStatus.ATTENDED,
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
 
     async def commit(self) -> None:
         await self._session.commit()
