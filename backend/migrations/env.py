@@ -25,8 +25,9 @@ if config.config_file_name is not None:
 import app.models  # noqa: E402,F401  (모델 import → metadata 등록)
 
 target_metadata = Base.metadata
-# DB URL은 alembic.ini가 아니라 Settings(.env)에서 읽는다
-config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+# DB URL은 alembic.ini가 아니라 Settings(.env)에서 읽는다. 호출 쪽이 지정했으면(테스트 DB) 그대로 쓴다
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

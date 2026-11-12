@@ -13,7 +13,9 @@ pnpm typecheck
 ```bash
 docker compose up -d
 cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload
-uv run pytest -q   # http://localhost:8000/api/v1/health, /docs
+uv run pytest -q   # 테스트는 teamup_test DB를 쓴다 (처음 한 번 생성: docs/progress.md "테스트·검증")
+# http://localhost:8000/api/v1/health, /docs
+uv run python -m scripts.seed_dev   # 화면 확인용 더미 데이터 (구장·사용자·매치, 다시 실행해도 쌓이지 않음)
 ```
 
 ## 협업 규칙
