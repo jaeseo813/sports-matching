@@ -138,4 +138,16 @@ cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:
 cd backend && uv run pytest -q && uv run ruff check . && uv run mypy app
 cd frontend && pnpm install && pnpm dev   # pnpm이 없으면 npx vite
 ```
+
+### 화면 확인용 시드 데이터
+화면은 코드 속 mock이 아니라 개발 DB에 넣은 더미로 확인한다(실제 API 경로가 함께 검증된다).
+```bash
+cd backend && uv run python -m scripts.seed_dev          # 시드를 지우고 다시 넣는다
+cd backend && uv run python -m scripts.seed_dev --clear  # 시드만 지운다 (빈 상태 화면 확인)
+```
+- 구장 6곳(이름 끝 "(시드)"), 사용자 8명(`s1`~`s8@seed.teamup.test`, 비밀번호 `password123`), 매치 8개(종목별, 신청·수락·승인 대기·정원 마감 포함).
+- 매치 날짜는 실행 시점 기준 "N일 뒤"로 계산하므로 다시 실행하면 지난 경기가 되지 않는다.
+- 시드가 아닌 데이터는 건드리지 않는다. `ENV=local`의 개발 DB에서만 돌고, 테스트 DB에는 넣지 않는다.
+- 시드 사용자는 동대문·성북·강남·마포 기준점이라, 내 계정도 온보딩에서 이 지역을 고르면 추천에 시드 매치가 나온다.
+
 `uv`가 없으면 `.venv/bin/<도구>`로 직접 실행할 수 있다. 의존성(`pyjwt`)을 추가했다면 `uv lock`으로 `uv.lock`을 갱신해야 한다.
