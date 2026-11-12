@@ -1,20 +1,14 @@
-// 배드민턴 종목 데이터. 백엔드 app/sports/badminton/과 id·인원 구성을 맞춘다.
+// 배드민턴 종목 데이터. 팀 인원과 티어 설명은 서버(GET /sports, useSportRules)에서 받고,
+// 여기에는 서버에 없는 화면 문구만 둔다.
 
-export const formats = [
-  { name: "단식", team: "1:1", total: 2, note: "코트가 좁고 길어서 혼자 넓게 움직여요." },
-  { name: "복식", team: "2:2", total: 4, note: "코트가 넓어지고, 파트너와 자리를 나눠 맡아요." },
-];
+// 인원 구성 카드의 보충 설명 (키: 팀당 인원). 서버에 새 인원이 생기면 설명 없이 표시된다.
+export const formatNotes: Record<number, string> = {
+  1: "코트가 좁고 길어서 혼자 넓게 움직여요.",
+  2: "코트가 넓어지고, 파트너와 자리를 나눠 맡아요.",
+};
 
-// 온보딩 자기평가용. 서열보다 경험으로 고르게 쓴다.
-export const tiers = [
-  { tier: 1, label: "배드민턴이 처음이거나 몇 번 쳐본 정도예요" },
-  { tier: 2, label: "가끔 친구들과 랠리를 즐겨요" },
-  { tier: 3, label: "꾸준히 치고, 클리어와 스매시가 익숙해요" },
-  { tier: 4, label: "동호회나 클럽에서 경기를 뛰어요" },
-  { tier: 5, label: "선수 출신이거나 대회에 나가는 수준이에요" },
-];
-
-// (질문, 답변). 방장이 정한 규칙이 있으면 그쪽이 우선이다.
+// (질문, 답변). backend/app/sports/badminton/faq.py와 같은 문구. 방장이 정한 규칙이 있으면 그쪽이 우선이다.
+// TODO: FAQ API가 생기면 서버 값으로 교체
 export const faq = [
   {
     q: "한 경기는 몇 점까지 하나요?",
