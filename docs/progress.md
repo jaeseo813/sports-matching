@@ -77,9 +77,13 @@
 - refresh 토큰을 localStorage에 두는 것은 XSS 시 탈취될 수 있다. 위협 모델에 기록하고 Red 단계 소재로 쓴다.
 
 ## 테스트·검증
-- pytest 231개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음).
-- DB가 필요한 테스트는 실제 MariaDB를 쓰고 항상 롤백한다. DB에 연결할 수 없으면 건너뛴다(컨테이너가 꺼져 있으면 조용히 건너뛰므로 `docker compose up -d db` 후 확인할 것).
-- **테스트가 개발 DB를 같이 쓴다.** 몇몇 테스트가 테이블이 비어 있다고 가정해서(`matches`, `venues`, `user_skills` 등), 화면 확인용으로 개발 DB에 구장·매치·자기평가를 넣어 두면 로컬 pytest가 실패한다. 테스트 전용 DB(예: `teamup_test`)를 따로 두는 게 해결책이다.
+- pytest 231개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). **CI에는 DB 서비스가 없어서 DB가 필요한 테스트 75개는 CI에서 건너뛴다.** 백엔드를 바꿨다면 로컬에서 DB를 켜고 pytest를 돌려야 한다.
+- DB가 필요한 테스트는 **테스트 전용 DB(`teamup_test`, `Settings.test_database_url`)**를 쓰고 항상 롤백한다. 개발 DB(`teamup`)의 데이터와 섞이지 않는다. pytest 시작 시 테스트 DB에 마이그레이션을 자동 적용한다.
+- DB 서버에 연결할 수 없으면 DB 테스트는 건너뛴다(컨테이너가 꺼져 있으면 조용히 건너뛰므로 `docker compose up -d db` 후 확인할 것).
+- 테스트 DB 주소가 `_test`로 끝나지 않거나 개발 DB와 같으면 pytest가 시작 전에 멈춘다.
+- **기존 DB 볼륨이면 테스트 DB를 한 번 만들어야 한다**(pytest가 안내 메시지와 함께 멈춘다). 레포 루트에서:
+  `docker compose exec -T db sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD"' < docker/db-init/01-test-db.sql`
+  새로 만든 볼륨은 `docker/db-init/`이 자동으로 실행한다. `.env`의 DB 비밀번호를 바꿨다면 `TEST_DATABASE_URL`도 `.env`에 넣는다(`.env.example` 참고).
 - 프론트는 `tsc --noEmit`·`vite build`만 있다(lint·test 스크립트 없음). 화면 흐름은 실서버 + 헤드리스 Chrome으로 수동 확인했다(가입 → 온보딩 → 개설 → 다른 사용자 신청 → 주최자 수락 → 대시보드 반영).
 - 보안 회귀 테스트: `tests/security/`
   - 인증: `alg=none` 위조, 잘못된 서명, refresh 토큰의 access 사용, refresh 재사용 시 family 폐기, 로그인 레이트리밋

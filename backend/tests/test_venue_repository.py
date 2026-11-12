@@ -16,7 +16,7 @@ CENTER = (127.0, 37.5)  # (lng, lat)
 
 @pytest.fixture
 async def session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(get_settings().database_url)
+    engine = create_async_engine(get_settings().test_database_url)
     try:
         conn = await engine.connect()
     except Exception:
