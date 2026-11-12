@@ -77,7 +77,7 @@
 - refresh 토큰을 localStorage에 두는 것은 XSS 시 탈취될 수 있다. 위협 모델에 기록하고 Red 단계 소재로 쓴다.
 
 ## 테스트·검증
-- pytest 231개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). **CI에는 DB 서비스가 없어서 DB가 필요한 테스트 75개는 CI에서 건너뛴다.** 백엔드를 바꿨다면 로컬에서 DB를 켜고 pytest를 돌려야 한다.
+- pytest 231개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). CI는 MariaDB 서비스(`teamup_test`)를 띄워 DB 테스트까지 모두 돌리고, 건너뛴 테스트가 하나라도 있으면 실패한다(DB 연결 실패를 놓치지 않게).
 - DB가 필요한 테스트는 **테스트 전용 DB(`teamup_test`, `Settings.test_database_url`)**를 쓰고 항상 롤백한다. 개발 DB(`teamup`)의 데이터와 섞이지 않는다. pytest 시작 시 테스트 DB에 마이그레이션을 자동 적용한다.
 - DB 서버에 연결할 수 없으면 DB 테스트는 건너뛴다(컨테이너가 꺼져 있으면 조용히 건너뛰므로 `docker compose up -d db` 후 확인할 것).
 - 테스트 DB 주소가 `_test`로 끝나지 않거나 개발 DB와 같으면 pytest가 시작 전에 멈춘다.

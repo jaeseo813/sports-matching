@@ -9,6 +9,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # DB가 필요한 테스트를 CI에서도 실제로 돌린다 (테스트 전용 DB, pytest가 마이그레이션을 적용한다)
+    services:
+      db:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: teamup_test
+          MARIADB_USER: teamup
+          MARIADB_PASSWORD: ci-only
+          MARIADB_ROOT_PASSWORD: ci-only-root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: mysql+asyncmy://teamup:ci-only@127.0.0.1:3306/teamup_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -16,7 +31,9 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app
-      - run: uv run pytest -q
+      - run: uv run pytest -q | tee "$RUNNER_TEMP/pytest.txt"
+      # DB 연결에 실패하면 DB 테스트가 조용히 건너뛰어진다. 건너뛴 테스트가 있으면 실패시킨다
+      - run: "! grep -q skipped \"$RUNNER_TEMP/pytest.txt\""
       # 마이그레이션 head가 갈라지지 않았는지 (두 개 이상이면 실패)
       - run: test "$(uv run alembic heads 2>/dev/null | grep -c '(head)')" -eq 1
       # 보안 게이트 (AGENTS.md 5절)
