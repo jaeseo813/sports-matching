@@ -1,44 +1,59 @@
 
 import MatchList from "../../components/MatchList";
+import { useSportRules } from "../../lib/sports";
 import { basketball } from ".";
-import { faq, formats, positions, tiers } from "./data";
+import { faq, formats, positions } from "./data";
 
 // 농구 담당 영역: 이 폴더(src/sports/basketball) 안에서만 작업한다.
 export default function Page() {
+  const sports = useSportRules();
+
+  const basketballRules = sports?.find(
+    (sport) => sport.id === "basketball"
+  );
+
   return (
     <div className="space-y-10">
       {/* 종목 소개 */}
-      <section className={`rounded-xl p-6 md:p-8 ${basketball.bg} ${basketball.fg}`}>
+      <section
+        className={`rounded-xl p-6 md:p-8 ${basketball.bg} ${basketball.fg}`}
+      >
         <basketball.icon size={28} aria-hidden="true" />
+
         <h1 className="mt-3 text-2xl font-black md:text-4xl">
           {basketball.name}
         </h1>
+
         <p className="mt-2 text-sm">
           3대3부터 5대5까지! 비슷한 실력의 사람들과 가까운 곳에서 농구를 즐겨 보세요.
         </p>
       </section>
 
-      {/* 인원 구성 */}
+      {/* 경기 인원 구성 */}
       <section aria-labelledby="formats">
         <h2 id="formats" className="mb-3 text-xl font-extrabold">
-          인원 구성
+          경기 방식
         </h2>
-        <ul className="grid gap-3 md:grid-cols-2">
-          {formats.map((f) => (
-            <li
-              key={f.name}
-              className="rounded-xl border border-edge bg-white p-5"
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {formats.map((format) => (
+            <article
+              key={format.name}
+              className="rounded-xl border border-border p-5"
             >
-              <p className="flex items-baseline justify-between">
-                <span className="text-lg font-bold">{f.name}</span>
-                <span className="text-sm font-medium text-muted">
-                  {f.team} · 총 {f.total}명
-                </span>
+              <h3 className="text-lg font-bold">{format.name}</h3>
+              <p className="mt-1 text-sm text-muted">
+                팀당 {format.team}
               </p>
-              <p className="mt-2 text-sm text-muted">{f.note}</p>
-            </li>
+              <p className="mt-2 text-sm">
+                총 {format.total}명이 필요한 경기예요.
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {format.note}
+              </p>
+            </article>
           ))}
-        </ul>
+        </div>
       </section>
 
       {/* 포지션 */}
@@ -46,49 +61,60 @@ export default function Page() {
         <h2 id="positions" className="mb-3 text-xl font-extrabold">
           농구 포지션
         </h2>
-        <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {positions.map((p) => (
-            <li
-              key={p.code}
-              className="rounded-xl border border-edge bg-white p-5"
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {positions.map((position) => (
+            <article
+              key={position.code}
+              className="rounded-xl border border-border p-5"
             >
-              <p className="flex items-baseline gap-2">
-                <span className="rounded-lg bg-lime px-2.5 py-1 text-sm font-black">
-                  {p.code}
+              <div className="flex items-center gap-2">
+                <span className="rounded-lg bg-muted px-3 py-1 font-black">
+                  {position.code}
                 </span>
-                <span className="font-bold">{p.name}</span>
+                <h3 className="font-bold">{position.name}</h3>
+              </div>
+
+              <p className="mt-3 text-sm text-muted">
+                {position.description}
               </p>
-              <p className="mt-2 text-sm text-muted">{p.description}</p>
-              <p className="mt-2 text-sm text-muted">{p.famousPlayer}</p>
-            </li>
+
+              <p className="mt-2 text-xs text-muted">
+                {position.famousPlayer}
+              </p>
+            </article>
           ))}
-        </ul>
+        </div>
       </section>
 
       {/* 티어 */}
       <section aria-labelledby="tiers">
-        <h2 id="tiers" className="mb-1 text-xl font-extrabold">
-          나는 어느 단계일까요?
+        <h2 id="tiers" className="mb-3 text-xl font-extrabold">
+          농구 실력 티어
         </h2>
-        <p className="mb-3 text-sm text-muted">
-          가장 가까운 설명을 고르면 돼요. 경기를 하면서 조금씩 맞춰져요.
-        </p>
-        <ol className="space-y-2">
-          {tiers.map((t) => (
-            <li
-              key={t.tier}
-              className="flex items-center gap-3 rounded-xl border border-edge bg-white p-4"
-            >
-              <span
-                className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-lime font-bold"
-                aria-label={`${t.tier}단계`}
-              >
-                {t.tier}
-              </span>
-              <span className="text-sm">{t.label}</span>
-            </li>
-          ))}
-        </ol>
+
+        {!basketballRules ? (
+          <p className="text-sm text-muted">
+            티어 정보를 불러오는 중이거나 불러오지 못했습니다.
+          </p>
+        ) : (
+          <ol className="space-y-2">
+            {Object.entries(basketballRules.tier_labels)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([tier, label]) => (
+                <li
+                  key={tier}
+                  className="flex items-start gap-3 rounded-xl border border-border p-4"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted font-black">
+                    {tier}
+                  </span>
+
+                  <span className="text-sm">{label}</span>
+                </li>
+              ))}
+          </ol>
+        )}
       </section>
 
       {/* 매치 목록 */}
@@ -96,30 +122,27 @@ export default function Page() {
         <h2 id="matches" className="mb-3 text-xl font-extrabold">
           모집 중인 농구 매치
         </h2>
+
         <MatchList sport="basketball" />
       </section>
 
       {/* FAQ */}
       <section aria-labelledby="faq">
         <h2 id="faq" className="mb-3 text-xl font-extrabold">
-          규칙 FAQ
+          자주 묻는 질문
         </h2>
-        <div className="space-y-2">
-          {faq.map((item) => (
-            <details
-              key={item.q}
-              className="rounded-xl border border-edge bg-white p-4"
+
+        <div className="space-y-3">
+          {faq.map((item, index) => (
+            <article
+              key={index}
+              className="rounded-xl border border-border p-5"
             >
-              <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">
-                {item.q}
-              </summary>
-              <p className="mt-1 text-sm text-muted">{item.a}</p>
-            </details>
+              <h3 className="font-bold">{item.q}</h3>
+              <p className="mt-2 text-sm text-muted">{item.a}</p>
+            </article>
           ))}
         </div>
-        <p className="mt-2 text-xs text-muted">
-          방장이 정한 규칙이 있으면 그쪽이 우선이에요.
-        </p>
       </section>
     </div>
   );
