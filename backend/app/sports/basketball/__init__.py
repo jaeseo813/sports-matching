@@ -1,4 +1,3 @@
-
 from app.sports.base import SportRules
 
 RULES = SportRules(
