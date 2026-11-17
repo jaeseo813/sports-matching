@@ -4,7 +4,6 @@ export const matchStatusLabel: Record<MatchOut["status"], string> = {
   open: "모집 중",
   full: "정원 마감",
   confirmed: "확정",
-  playing: "진행 중",
   completed: "종료",
   canceled: "취소됨",
 };

@@ -61,6 +61,7 @@ async def to_match_out(
         status=match.status,
         my_status=my_status,
         is_host=viewer_id is not None and match.host_id == viewer_id,
+        rated=match.rated_at is not None,
     )
 
 
@@ -215,7 +216,7 @@ async def list_participations(
         raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
     _require_host(match, host)
     return [
-        ParticipationOut(id=p.id, nickname=nick, status=p.status)
+        ParticipationOut(id=p.id, user_id=p.user_id, nickname=nick, status=p.status)
         for p, nick in await matches.list_participations(match_id)
     ]
 
@@ -265,8 +266,8 @@ async def cancel_application(matches: MatchRepository, user: User, match_id: int
         raise _error(404, "PARTICIPATION_NOT_FOUND", "취소할 신청이 없습니다")
     if match.host_id == user.id:
         raise _error(409, "HOST_CANNOT_LEAVE", "주최자는 매치를 취소해야 합니다")
-    if match.status in (MatchStatus.PLAYING, MatchStatus.COMPLETED):
-        raise _error(409, "MATCH_NOT_OPEN", "진행 중이거나 끝난 매치는 취소할 수 없습니다")
+    if match.status is MatchStatus.COMPLETED:
+        raise _error(409, "MATCH_NOT_OPEN", "끝난 매치는 취소할 수 없습니다")
     part.status = ParticipationStatus.CANCELED
     # 상태 변경은 다음 쿼리 전에 flush되므로 다시 세면 취소가 반영된 수락 인원이 나온다
     accepted = await matches.count_accepted(match_id)
@@ -298,13 +299,6 @@ async def confirm_match(matches: MatchRepository, host: User, match_id: int) -> 
 async def cancel_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
     match = await _transition(matches, host, match_id, MatchStatus.CANCELED)
     match.status = MatchStatus.CANCELED
-    await matches.commit()
-    return match.status
-
-
-async def start_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
-    match = await _transition(matches, host, match_id, MatchStatus.PLAYING)
-    match.status = MatchStatus.PLAYING
     await matches.commit()
     return match.status
 

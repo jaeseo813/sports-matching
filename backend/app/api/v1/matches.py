@@ -24,6 +24,7 @@ from app.schemas.match import (
     RateOut,
     RecommendedOut,
     ReviewIn,
+    ReviewTargetOut,
     TeamsOut,
 )
 from app.services import matches as match_service
@@ -148,11 +149,6 @@ async def cancel(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[s
     return {"status": await match_service.cancel_match(matches, user, match_id)}
 
 
-@router.post("/{match_id}/start", response_model=dict[str, MatchStatus])
-async def start(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[str, MatchStatus]:
-    return {"status": await match_service.start_match(matches, user, match_id)}
-
-
 @router.post("/{match_id}/complete", response_model=dict[str, MatchStatus])
 async def complete(match_id: int, user: CurrentUser, matches: MatchRepo) -> dict[str, MatchStatus]:
     return {"status": await match_service.complete_match(matches, user, match_id)}
@@ -193,6 +189,13 @@ async def submit_review(
 ) -> Response:
     await review_service.submit_review(matches, reviews, user, match_id, data)
     return Response(status_code=204)
+
+
+@router.get("/{match_id}/reviews/targets", response_model=list[ReviewTargetOut])
+async def review_targets(
+    match_id: int, user: CurrentUser, matches: MatchRepo, reviews: ReviewRepo
+) -> list[ReviewTargetOut]:
+    return await review_service.list_review_targets(matches, reviews, user, match_id)
 
 
 @router.post("/{match_id}/rate", response_model=RateOut)

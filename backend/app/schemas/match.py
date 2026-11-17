@@ -50,6 +50,7 @@ class MatchOut(BaseModel):
     status: MatchStatus
     my_status: ParticipationStatus | None = None  # 요청자의 신청 상태
     is_host: bool = False  # 요청자가 주최자인지 (주최자 id는 노출하지 않는다)
+    rated: bool = False  # 레이팅에 반영됐는지 (반영 뒤에는 출석·평가를 바꿀 수 없다)
 
 
 class MySummaryOut(BaseModel):
@@ -62,6 +63,7 @@ class MySummaryOut(BaseModel):
 
 class ParticipationOut(BaseModel):
     id: int
+    user_id: int  # 출석·팀 수동 배정에 쓴다 (주최자만 받는다)
     nickname: str
     status: ParticipationStatus
 
@@ -90,6 +92,7 @@ class ApplyIn(BaseModel):
 
 
 class TeamMemberOut(BaseModel):
+    user_id: int  # 주최자의 수동 배정에 쓴다
     nickname: str
     tier: int  # 티어 배지. 숫자 레이팅은 노출하지 않는다
     position: str | None
@@ -138,6 +141,12 @@ class AttendanceIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     attendances: list[AttendanceItemIn] = Field(min_length=1, max_length=60)
+
+
+class ReviewTargetOut(BaseModel):
+    user_id: int
+    nickname: str
+    reviewed: bool  # 내가 이미 평가했는지
 
 
 class RateOut(BaseModel):

@@ -36,9 +36,10 @@ def _out(
     manual: bool,
 ) -> TeamsOut:
     teams: dict[int, list[TeamMemberOut]] = {}
-    for _, nick, team_no, pos, rating in rows:
+    for uid, nick, team_no, pos, rating in rows:
         teams.setdefault(team_no, []).append(
             TeamMemberOut(
+                user_id=uid,
                 nickname=nick,
                 tier=tier_from_rating(rating if rating is not None else _DEFAULT_RATING),
                 position=pos,

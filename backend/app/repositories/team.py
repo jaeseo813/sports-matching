@@ -4,9 +4,9 @@ from typing import Protocol
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ParticipationStatus
 from app.models.match import Participation, TeamAssignment
 from app.models.user import User, UserSkill
+from app.repositories.match import JOINED_STATUSES
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class SqlTeamRepository:
             )
             .where(
                 Participation.match_id == match_id,
-                Participation.status == ParticipationStatus.ACCEPTED,
+                Participation.status.in_(JOINED_STATUSES),  # 경기 뒤에도 팀을 볼 수 있게
             )
             .order_by(Participation.id)
         )

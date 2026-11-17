@@ -9,6 +9,10 @@ from app.models.enums import GenderPolicy, MatchStatus, ParticipationStatus
 from app.models.match import Match, Participation
 from app.models.user import User
 
+# 참가 인원으로 세는 상태. 출석(ATTENDED)은 경기 종료 뒤에만 생기므로 정원·확정 판단에는 영향이 없고,
+# 경기 뒤에도 "4/4명"처럼 실제 뛴 인원이 보이게 한다
+JOINED_STATUSES = (ParticipationStatus.ACCEPTED, ParticipationStatus.ATTENDED)
+
 
 class DuplicateParticipationError(Exception):
     """같은 매치에 이미 신청했다 (uq_participations_match_user)."""
@@ -109,7 +113,7 @@ class SqlMatchRepository:
     async def count_accepted(self, match_id: int) -> int:
         stmt = select(func.count()).where(
             Participation.match_id == match_id,
-            Participation.status == ParticipationStatus.ACCEPTED,
+            Participation.status.in_(JOINED_STATUSES),
         )
         return int((await self._session.execute(stmt)).scalar_one())
 
@@ -120,7 +124,7 @@ class SqlMatchRepository:
             select(Participation.match_id, func.count())
             .where(
                 Participation.match_id.in_(match_ids),
-                Participation.status == ParticipationStatus.ACCEPTED,
+                Participation.status.in_(JOINED_STATUSES),
             )
             .group_by(Participation.match_id)
         )
