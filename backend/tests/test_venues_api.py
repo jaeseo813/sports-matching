@@ -5,7 +5,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_user_repo, get_venue_repo
 from app.core.ratelimit import login_limiter
-from app.core.token_store import token_store
 from app.main import app
 from app.models.enums import Role
 from app.repositories.venue import VenueRow
@@ -54,7 +53,6 @@ def repos() -> Iterator[tuple[FakeUserRepo, FakeVenueRepo]]:
     app.dependency_overrides[get_user_repo] = lambda: users
     app.dependency_overrides[get_venue_repo] = lambda: venues
     login_limiter.reset()
-    token_store.__init__()  # type: ignore[misc]
     yield users, venues
     app.dependency_overrides.clear()
 

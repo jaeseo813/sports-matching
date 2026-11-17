@@ -12,19 +12,9 @@ async def test_me_requires_token(api: AsyncClient) -> None:
     assert res.status_code == 401
 
 
-async def test_refresh_token_cannot_be_used_as_access(api: AsyncClient) -> None:
-    tokens = await _login(api)
-    res = await api.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {tokens['refresh_token']}"}
-    )
-    assert res.status_code == 401
-
-
 async def test_alg_none_token_rejected(api: AsyncClient) -> None:
     await _login(api)
-    forged = jwt.encode(
-        {"sub": "1", "type": "access", "jti": "x", "exp": 9999999999}, key="", algorithm="none"
-    )
+    forged = jwt.encode({"sub": "1", "exp": 9999999999}, key="", algorithm="none")
     res = await api.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {forged}"})
     assert res.status_code == 401
 
@@ -32,7 +22,7 @@ async def test_alg_none_token_rejected(api: AsyncClient) -> None:
 async def test_token_signed_with_wrong_secret_rejected(api: AsyncClient) -> None:
     await _login(api)
     forged = jwt.encode(
-        {"sub": "1", "type": "access", "jti": "x", "exp": 9999999999},
+        {"sub": "1", "exp": 9999999999},
         "wrong-secret-" * 4,
         algorithm="HS256",
     )
@@ -40,17 +30,11 @@ async def test_token_signed_with_wrong_secret_rejected(api: AsyncClient) -> None
     assert res.status_code == 401
 
 
-async def test_refresh_reuse_revokes_whole_family(api: AsyncClient) -> None:
-    tokens = await _login(api)
-    first = await api.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert first.status_code == 200
-    replay = await api.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert replay.status_code == 401
-    # 재사용이 감지되면 정상 갱신으로 받은 새 토큰도 함께 무효화된다
-    newer = await api.post(
-        "/api/v1/auth/refresh", json={"refresh_token": first.json()["refresh_token"]}
-    )
-    assert newer.status_code == 401
+async def test_expired_token_rejected(api: AsyncClient) -> None:
+    await _login(api)
+    expired = jwt.encode({"sub": "1", "exp": 1}, get_settings().jwt_secret, algorithm="HS256")
+    res = await api.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {expired}"})
+    assert res.status_code == 401
 
 
 async def test_login_rate_limited(api: AsyncClient) -> None:

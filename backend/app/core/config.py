@@ -20,10 +20,10 @@ class Settings(BaseSettings):
     database_url: str = "mysql+asyncmy://teamup:change-me@localhost:3306/teamup"
     # pytest 전용. 개발 DB와 분리해 화면 확인용 데이터가 테스트를 깨뜨리지 않게 한다 (이름은 _test로 끝나야 한다)
     test_database_url: str = "mysql+asyncmy://teamup:change-me@localhost:3306/teamup_test"
-    redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = _INSECURE_DEFAULT
-    access_token_minutes: int = 30
-    refresh_token_days: int = 14
+    access_token_minutes: int = (
+        60 * 24
+    )  # refresh 토큰 없이 access 하나만 쓴다 (만료되면 다시 로그인)
     anthropic_api_key: str = ""
     kakao_map_key: str = ""
 

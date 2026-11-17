@@ -11,7 +11,6 @@ from app.api.v1.matches import apply_limiter
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.ratelimit import login_limiter
-from app.core.token_store import token_store
 from app.main import app
 from app.models.venue import Venue, VenueSport
 
@@ -45,7 +44,6 @@ async def api(session: AsyncSession) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides[get_session] = _session
     login_limiter.reset()
     apply_limiter.reset()
-    token_store.__init__()  # type: ignore[misc]
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()

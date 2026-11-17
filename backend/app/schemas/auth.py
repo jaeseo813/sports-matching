@@ -22,15 +22,8 @@ class LoginIn(BaseModel):
     password: str = Field(max_length=128)
 
 
-class RefreshIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    refresh_token: str = Field(max_length=2048)
-
-
 class TokenOut(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"  # noqa: S105 (OAuth2 토큰 종류 이름)
 
 

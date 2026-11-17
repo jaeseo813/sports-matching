@@ -5,7 +5,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_user_repo
 from app.core.ratelimit import login_limiter
-from app.core.token_store import token_store
 from app.main import app
 from app.models.enums import Gender
 from app.models.user import User
@@ -56,7 +55,6 @@ def repo() -> Iterator[FakeUserRepo]:
     fake = FakeUserRepo()
     app.dependency_overrides[get_user_repo] = lambda: fake
     login_limiter.reset()
-    token_store.__init__()  # type: ignore[misc]
     yield fake
     app.dependency_overrides.clear()
 
@@ -105,16 +103,6 @@ async def test_login_wrong_password(api: AsyncClient) -> None:
     assert res.json()["detail"]["code"] == "INVALID_CREDENTIALS"
 
 
-async def test_refresh_rotates(api: AsyncClient) -> None:
+async def test_login_returns_access_token_only(api: AsyncClient) -> None:
     tokens = await _login(api)
-    res = await api.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert res.status_code == 200
-    assert res.json()["refresh_token"] != tokens["refresh_token"]
-
-
-async def test_logout_invalidates_refresh(api: AsyncClient) -> None:
-    tokens = await _login(api)
-    out = await api.post("/api/v1/auth/logout", json={"refresh_token": tokens["refresh_token"]})
-    assert out.status_code == 204
-    res = await api.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert res.status_code == 401
+    assert set(tokens) == {"access_token", "token_type"}

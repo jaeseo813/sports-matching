@@ -34,7 +34,7 @@
 
 **작업 흐름**
 1. `main`을 pull하고 `feat/<이슈번호>-<설명>` 브랜치를 만들어요.
-2. `docker compose up -d`로 내 컴퓨터에 DB·Redis를 띄워요. (DB는 각자 로컬 것)
+2. `docker compose up -d`로 내 컴퓨터에 DB를 띄워요. (DB는 각자 로컬 것)
 3. `cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload`
 4. 프론트는 `cd frontend && pnpm dev`로 띄워서 내 로컬 백엔드에 붙여요.
 5. PR을 올리면 CI(lint, 테스트, 보안 스캔)가 돌고, 리뷰 1명 승인 후 머지해요.
