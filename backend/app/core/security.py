@@ -6,9 +6,8 @@ Blue 단계에서 argon2로 패치한다). 패치할 때는 아래 두 함수만
 """
 
 import hmac
-import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any
 
 import jwt
 
@@ -16,8 +15,6 @@ from app.core.config import get_settings
 
 _ALGORITHM = "HS256"
 _ALLOWED_ALGORITHMS = [_ALGORITHM]  # 알고리즘 화이트리스트 (none, 비대칭키 혼동 방지)
-
-TokenType = Literal["access", "refresh"]
 
 
 class TokenError(Exception):
@@ -32,38 +29,24 @@ def verify_password(plain: str, stored: str) -> bool:
     return hmac.compare_digest(plain.encode(), stored.encode())
 
 
-def create_token(user_id: int, kind: TokenType, *, family: str | None = None) -> tuple[str, str]:
-    """(토큰, jti)를 돌려준다. refresh 토큰의 family는 로그인 1회당 하나로 유지된다."""
-    settings = get_settings()
+def create_token(user_id: int) -> str:
     now = datetime.now(UTC)
-    ttl = (
-        timedelta(minutes=settings.access_token_minutes)
-        if kind == "access"
-        else timedelta(days=settings.refresh_token_days)
-    )
-    jti = uuid.uuid4().hex
     claims: dict[str, Any] = {
         "sub": str(user_id),
-        "type": kind,
-        "jti": jti,
         "iat": now,
-        "exp": now + ttl,
+        "exp": now + timedelta(minutes=get_settings().access_token_minutes),
     }
-    if kind == "refresh":
-        claims["fam"] = family or uuid.uuid4().hex
-    return jwt.encode(claims, settings.jwt_secret, algorithm=_ALGORITHM), jti
+    return jwt.encode(claims, get_settings().jwt_secret, algorithm=_ALGORITHM)
 
 
-def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
+def decode_token(token: str) -> dict[str, Any]:
     try:
         claims: dict[str, Any] = jwt.decode(
             token,
             get_settings().jwt_secret,
             algorithms=_ALLOWED_ALGORITHMS,
-            options={"require": ["exp", "sub", "type", "jti"]},
+            options={"require": ["exp", "sub"]},
         )
     except jwt.PyJWTError as exc:
         raise TokenError from exc
-    if claims["type"] != expected_type:
-        raise TokenError
     return claims

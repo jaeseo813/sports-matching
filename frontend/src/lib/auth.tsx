@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, getStoredRefresh, post, refreshOnce, setTokens, type Tokens } from "./api/client";
+import { api, hasToken, post, setToken, type Tokens } from "./api/client";
 
 export type Gender = "male" | "female" | "other";
 
@@ -20,7 +20,7 @@ export interface SignupInput {
 
 interface AuthState {
   user: User | null;
-  loading: boolean; // 새로고침 직후 저장된 refresh로 세션을 복구하는 중
+  loading: boolean; // 새로고침 직후 저장된 토큰으로 세션을 복구하는 중
   signedOut: boolean; // 방금 직접 로그아웃했다 (로그인 화면이 아니라 시작 화면으로 보낸다)
   login: (email: string, password: string) => Promise<void>;
   signup: (input: SignupInput) => Promise<void>;
@@ -32,19 +32,17 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [signedOut, setSignedOut] = useState(false);
-  const [loading, setLoading] = useState(() => getStoredRefresh() !== null);
+  const [loading, setLoading] = useState(hasToken);
 
   useEffect(() => {
     if (!loading) return;
     let alive = true;
     (async () => {
       try {
-        if (await refreshOnce()) {
-          const me = await api<User>("/auth/me");
-          if (alive) setUser(me);
-        }
+        const me = await api<User>("/auth/me");
+        if (alive) setUser(me);
       } catch {
-        setTokens(null);
+        setToken(null);
       } finally {
         if (alive) setLoading(false);
       }
@@ -55,7 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loading]);
 
   const login = useCallback(async (email: string, password: string) => {
-    setTokens(await post<Tokens>("/auth/login", { email, password }, { auth: false }));
+    const { access_token } = await post<Tokens>("/auth/login", { email, password }, { auth: false });
+    setToken(access_token);
     setUser(await api<User>("/auth/me"));
     setSignedOut(false);
   }, []);
@@ -69,11 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const refresh = getStoredRefresh();
-    setTokens(null);
+    setToken(null); // 서버에 세션 상태가 없어 토큰을 지우면 끝이다
     setSignedOut(true);
     setUser(null);
-    if (refresh) await post("/auth/logout", { refresh_token: refresh }, { auth: false }).catch(() => undefined);
   }, []);
 
   const value = useMemo(() => ({ user, loading, signedOut, login, signup, logout }), [user, loading, signedOut, login, signup, logout]);

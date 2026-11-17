@@ -46,7 +46,7 @@ async def require_user(
     if creds is None:
         raise _unauthorized()
     try:
-        claims = decode_token(creds.credentials, "access")
+        claims = decode_token(creds.credentials)
     except TokenError:
         raise _unauthorized() from None
     user = await repo.get_by_id(int(claims["sub"]))

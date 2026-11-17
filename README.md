@@ -9,7 +9,7 @@ cd frontend && pnpm install && pnpm dev
 pnpm typecheck
 ```
 
-백엔드 (uv 필요, Docker로 DB·Redis 실행):
+백엔드 (uv 필요, Docker로 DB 실행):
 ```bash
 docker compose up -d
 cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload

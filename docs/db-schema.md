@@ -56,4 +56,4 @@ erDiagram
 - **서비스에서 검증할 것**: 자기 자신 평가 금지(MariaDB가 `ON DELETE SET NULL` 컬럼의 CHECK를 허용하지 않음), 같은 쌍 30일 내 1회 반영, 매치 인원이 종목 규칙(`SportRules`)에 맞는지, 가중치 합계.
 - **rating/rd/volatility**는 서버 내부 값이다. 사용자에게 숫자로 노출하지 않는다.
 - **탈퇴**: users는 행을 지우지 않고 개인정보만 지운다 (`is_active`, `deleted_at`). FK가 `RESTRICT`인 이유다.
-- 로그인 토큰(refresh 회전·재사용 감지)용 테이블은 W3 인증 PR에서 추가한다.
+- 로그인은 access JWT 하나만 쓰므로 토큰 저장 테이블은 없다.

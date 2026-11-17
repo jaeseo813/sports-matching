@@ -38,7 +38,7 @@
 
 | 영역 | 엔드포인트 | 권한 |
 |---|---|---|
-| 인증 | `POST /auth/signup`, `login`, `refresh`, `logout`, `GET /auth/me` | 가입·로그인은 공개, 로그인 5/분 |
+| 인증 | `POST /auth/signup`, `login`, `GET /auth/me` (access JWT 하나, 24시간, refresh 없음) | 가입·로그인은 공개, 로그인 5/분 |
 | 온보딩 | `PUT /me/skills/{sport}`, `PUT/DELETE /me/locations/{slot}`, `PUT /me/preferences`, `PUT/DELETE /me/blocks/{id}` + 각 `GET` | 로그인 |
 | 구장 | `GET /venues/nearby`, `GET /venues/{id}`, `POST /venues` | 조회는 로그인, 등록은 관리자 |
 | 매치 | `POST /matches`, `GET /matches`, `GET /matches/{id}` | 로그인 |
@@ -64,8 +64,8 @@
 - 공통: `SportPicker`(대시보드·매치 페이지), `AppLayout` 위쪽 여백, `MatchCard`의 참가 단계 표시.
 - 풋살 종목 페이지(`sports/football/`): 배드민턴과 같은 구성에 5:5·6:6 필터와 소개 영역(경기장 라인)이 추가됐다. 매치는 mock(`data.ts`). 종목 표시 이름은 "풋살".
 - 농구 페이지(`sports/basketball/`)는 `main`에는 아직 "준비 중" 화면이다. 팀원(darelljay)이 `origin/Jason` 브랜치(2026-11-08, 커밋 2개)에 작성했고 **PR은 아직 없다**. 인원 구성(3:3·5:5), 포지션 5개, 티어 1~5, mock 매치 3개, FAQ 6개를 담았다. `main`과 충돌 없음(병합 시뮬레이션으로 확인).
-- API 클라이언트(`lib/api/client.ts`): access 토큰은 메모리, refresh 토큰은 localStorage(`teamup.refresh`). 401이면 refresh를 한 번만 하고 재시도한다. 오류는 `ApiError(code, message, fields)`로 바꾼다.
-- 인증(`lib/auth.tsx`, `/login`, `/signup`): 가입 후 자동 로그인, 새로고침 시 세션 복구, 로그아웃 시 서버 refresh 무효화. 헤더에 닉네임·로그아웃.
+- API 클라이언트(`lib/api/client.ts`): access 토큰 하나를 localStorage(`teamup.token`)에 둔다. 401이면 토큰을 지운다(다시 로그인). 오류는 `ApiError(code, message, fields)`로 바꾼다.
+- 인증(`lib/auth.tsx`, `/login`, `/signup`): 가입 후 자동 로그인, 새로고침 시 세션 복구, 로그아웃은 토큰 삭제(서버 세션 없음). 헤더에 닉네임·로그아웃.
 - **로그인 필수 구간**(`RequireAuth`): 비로그인은 시작 화면(`/`)·`/login`·`/signup`만. 나머지 주소는 로그인 화면으로 보내고 로그인 후 원래 주소로 돌아온다. 직접 로그아웃하면 시작 화면으로 간다(다음 사용자가 이전 사용자의 페이지로 돌아가지 않게).
 - 시작 화면: 비로그인은 "로그인 / 시작하기(가입)", 로그인하면 "○○님의 대시보드". "매치 찾기"·종목 타일은 가드를 거친다.
 - 온보딩(`/onboarding`): 가입 직후 이동. 종목(복수) → 종목별 자기평가 티어·경력(티어 설명은 `GET /sports`) → 활동 지역(구 단위 후보 + 이동 거리). 내 정보에서 다시 들어와 수정할 수 있다. 정확한 현재 위치는 받지 않는다.
@@ -74,7 +74,7 @@
 - 내 정보(`/me`): 닉네임·이메일, 종목별 티어 배지·설명·추이(↑/→/↓), 활동 지역, 로그아웃.
 - 공통 코드: `lib/useApi.ts`(GET 훅), `lib/sports.ts`(종목 규칙 캐시), `lib/labels.ts`(상태 문구), `components/MatchList.tsx`(종목 페이지에서도 쓰는 목록).
 - **없는 것**: 경기 진행(확정·시작·종료), 팀 분배, 출석, 상호 평가 화면. 구장 등록(관리자) 화면. TanStack Query(`pnpm`이 없어 의존성 추가를 미룸, 지금은 `useEffect`로 불러온다).
-- refresh 토큰을 localStorage에 두는 것은 XSS 시 탈취될 수 있다. 위협 모델에 기록하고 Red 단계 소재로 쓴다.
+- 토큰을 localStorage에 두므로 XSS 시 탈취될 수 있고, 서버가 토큰을 무효화할 수 없다(만료까지 유효). 범위 축소로 받아들인 한계다.
 
 ## 테스트·검증
 - pytest 231개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). CI는 MariaDB 서비스(`teamup_test`)를 띄워 DB 테스트까지 모두 돌리고, 건너뛴 테스트가 하나라도 있으면 실패한다(DB 연결 실패를 놓치지 않게).
@@ -86,7 +86,7 @@
   새로 만든 볼륨은 `docker/db-init/`이 자동으로 실행한다. `.env`의 DB 비밀번호를 바꿨다면 `TEST_DATABASE_URL`도 `.env`에 넣는다(`.env.example` 참고).
 - 프론트는 `tsc --noEmit`·`vite build`만 있다(lint·test 스크립트 없음). 화면 흐름은 실서버 + 헤드리스 Chrome으로 수동 확인했다(가입 → 온보딩 → 개설 → 다른 사용자 신청 → 주최자 수락 → 대시보드 반영).
 - 보안 회귀 테스트: `tests/security/`
-  - 인증: `alg=none` 위조, 잘못된 서명, refresh 토큰의 access 사용, refresh 재사용 시 family 폐기, 로그인 레이트리밋
+  - 인증: `alg=none` 위조, 잘못된 서명, 만료 토큰, 로그인 레이트리밋
   - 인가: 비로그인 401, 주최자 전용 403, 다른 매치의 신청 id 접근 404, 타인의 신청 취소·차단 목록 접근 불가
   - 입력: 알 수 없는 종목·필드 거부, 좌표 범위, SQL 인젝션 문자열 거부, 응답에 개인정보 없음
 
@@ -97,7 +97,7 @@
 
 ### 코어
 - 관리자를 만드는 방법이 없다. 구장 등록(`POST /venues`)이 관리자 전용이라 지금은 DB에서 `users.role`을 직접 `admin`으로 바꾸거나 스크립트로 구장을 넣어야 한다. 구장이 없으면 매치를 열 수 없다.
-- 토큰 저장소(refresh)와 레이트리밋이 **인메모리**다. 서버를 재시작하면 로그아웃되고 워커가 여러 개면 재사용 감지가 어긋난다. Redis로 교체해야 한다.
+- 레이트리밋은 **인메모리**다(Redis 안 씀). 서버를 재시작하면 초기화되고 워커가 여러 개면 워커별로 센다. 학회 데모 규모라 그대로 둔다.
 - 정원 경합을 **동시 요청**으로 검증하지 못했다(테스트가 단일 연결).
 - 구장 SPATIAL INDEX를 실제로 쓰는지 `EXPLAIN`으로 확인하지 못했다(개발 DB에 구장이 없었음).
 - 로그인 실패·권한 거부의 보안 이벤트 로깅, 로그 마스킹, 입력 이상 탐지는 없다.

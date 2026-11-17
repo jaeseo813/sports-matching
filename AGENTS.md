@@ -1,7 +1,7 @@
 # TeamUp (가칭) — 팀 스포츠 매칭 플랫폼
 
 풋살·농구처럼 인원이 모여야 하는 운동을, 참가자를 **거리·실력 기준으로 매칭**해 혼자서도 할 수 있게 하는 웹 서비스.
-**학회 프로젝트**. 목표는 두 가지이며 순서가 있다: ① 서비스를 끝까지 동작시킨다 → ② 그 위에 보안을 직접 공격·방어하며 학습한다 (5절).
+**학회 프로젝트**. 목표는 두 가지이며 순서가 있다: ① 서비스를 끝까지 동작시킨다 → ② 그 위에 **챗봇 입·출력 가드**를 만들고 직접 공격·방어하며 학습한다 (5절).
 일정이 밀리면 기능을 버리고 보안은 지킨다. 서비스명은 가칭 — 확정되면 이 문서와 `app/core/config.py`를 함께 수정.
 
 **1차 지원 종목**: 농구, 풋살(id `football`, 11인제 축구는 범위 밖), 배드민턴 (프론트 `src/sports/<종목>/` 폴더로 분리, 종목 담당자는 자기 폴더 안에서만 작업, 등록은 `src/sports/registry.ts`).
@@ -12,11 +12,11 @@
 
 ## 2. 기술 스택
 - 백엔드: Python 3.12, FastAPI(async), MariaDB 11(공간 기능), SQLAlchemy 2.0 async(`asyncmy`) + Alembic, Pydantic v2
-- 인증: JWT(access 30분 / refresh 14일), 비밀번호는 현재 원문 저장(5절, Blue 단계에서 argon2로 패치). 캐시·레이트리밋: Redis (없으면 인메모리 degrade)
+- 인증: JWT access 토큰 하나(24시간, refresh·서버 세션 없음). 비밀번호는 현재 원문 저장(5절). Redis 없음(레이트리밋은 인메모리)
 - 프론트(가정): React 19 + Vite + TS, TanStack Query, Zustand, Tailwind + shadcn/ui, Kakao Maps, react-hook-form + zod
 - 챗봇: `anthropic` SDK(`AsyncAnthropic`), 모델 `claude-opus-5-5`(날짜 접미사 금지), SSE 스트리밍, tool use
-- 보안 도구: bandit, ruff(S), semgrep, pip-audit, pnpm audit, gitleaks, OWASP ZAP, Burp Community
-- 인프라: docker-compose(api, db, redis, web), GitHub Actions(lint + test + 보안 스캔 게이트)
+- 보안 도구: bandit, ruff(S), pip-audit, gitleaks (웹 스캐너 ZAP·Burp는 범위 밖)
+- 인프라: docker-compose(db, api), GitHub Actions(lint + test + 보안 스캔 게이트)
 
 ## 3. 구조 규칙
 ```
@@ -52,28 +52,30 @@ Venue, Match(status: open→full→confirmed→playing→completed/canceled), Pa
 
 **팀 분배**: 포지션 제약(풋살 팀당 GK 1) → rating 스네이크 드래프트 → 2-opt 스왑으로 합 차이 최소화. 주최자가 수동 조정 가능.
 
-## 5. 보안 (최종 목표)
-**방식**: v0 기능 완성 → 진단(Red: PoC 재현, `docs/security/findings/NNN-*.md`에 재현/영향/증거/심각도) → 방어(Blue: 패치 → 같은 PoC 재검증 → `tests/security/` 회귀 테스트).
-공격 실습은 **우리 소유 로컬·스테이징에서만**. 학습을 위해 일부 취약점(현재: **비밀번호 원문 저장**)을 `main`에 의도적으로 남겨 두고 Red 단계에서 진단, Blue 단계에서 패치한다. 따라서 **외부 공개 배포 금지**, 실제 비밀번호·개인정보 입력 금지(더미 데이터만). 의도적 취약점 목록은 `docs/security/threat-model.md`에 기록한다.
-기본 방어(아래)는 W3부터 **모든 기능 PR에 포함**한다. W13~14는 진단·검증·문서화 주차.
+## 5. 보안 (최종 목표: 챗봇 가드)
+웹해킹 전반이 아니라 **챗봇 입력 가드·출력 가드**를 만들고, 직접 공격해 우회하고 막는 과정을 학습한다. 웹 쪽은 아래 기본 규칙까지만 지킨다.
+**방식**: 챗봇 v0 → 공격(Red: 공격 프롬프트 세트로 우회 시도, `docs/security/findings/NNN-*.md`에 재현/영향/증거/심각도) → 방어(Blue: 가드 보강 → 같은 세트로 재검증 → `tests/security/test_chat_*.py` 회귀 테스트).
+공격 실습은 **우리 소유 로컬·스테이징에서만**, **외부 공개 배포 금지**, 실제 개인정보 입력 금지(더미 데이터만). 위협 모델은 `docs/security/threat-model.md`.
 
-**기본 코딩 규칙**
+**가드** (`services/chat_guard.py`, 챗봇 호출 앞뒤에서 항상 실행)
+- 입력 가드: 길이 상한, 프롬프트 인젝션·탈옥(시스템 프롬프트 추출, 역할 바꾸기), 타인 정보 요청, 서비스 범위 밖 요청, 사용자가 넣은 개인정보(전화번호·이메일 등)
+- 출력 가드: 개인정보(이메일·전화·좌표·주소·실명), 시스템 프롬프트·내부 정보 노출, 허용 안 된 HTML·링크, 쓰기 동작 실행 안내
+- 걸리면 차단 또는 마스킹하고 사유 코드를 보안 이벤트로 기록한다(원문 대신 마스킹된 값만)
+- **판정 방식은 미정**: 규칙 기반(정규식 마스킹·키워드) / LLM 분류 / 둘 결합(규칙 먼저, 애매한 것만 LLM). 같은 공격 세트로 **차단율·정상 질문 오탐률·추가 지연**을 비교해 정한다. 비교할 수 있게 입력·출력 가드의 호출 형태는 하나로 고정하고 구현만 바꾼다
+
+**기본 코딩 규칙** (웹)
 - SQL 문자열 조립 금지(f-string/`%`/`+`), 바인드 파라미터 100%
 - 모든 엔드포인트에 인가 의존성(`Depends(require_*)`) + **객체 소유권 검사**. 없으면 머지 불가
 - 응답은 Pydantic 화이트리스트 스키마만, ORM 객체·`dict` 직접 반환 금지
 - 입력 검증은 Pydantic에서(길이·범위·enum), 좌표는 lat 33~39 / lng 124~132
-- 인증: 비밀번호 처리는 `core/security.py`의 `hash_password`/`verify_password`에만 둔다(현재 원문 저장, Blue 단계에서 argon2로 교체). refresh 회전 + 재사용 감지, 로그아웃 시 무효화, JWT 알고리즘 화이트리스트
-- 레이트리밋: 로그인 5/분, 매치 신청 10/분, 챗봇 20/5분, 지오코딩 30/시간
-- 보안 헤더(HSTS, CSP, X-Content-Type-Options, Referrer-Policy, X-Frame-Options), 운영은 Swagger 비활성·CORS 제한
-- 정원 초과 레이스는 `SELECT ... FOR UPDATE` / 유니크 제약으로 방지
-- 스코어링·레이팅은 서버에서만 계산(클라이언트 입력은 필터 조건까지)
+- 인증: JWT access 하나, 알고리즘 화이트리스트, 로그아웃은 클라이언트가 토큰 삭제. 비밀번호 처리는 `core/security.py`의 `hash_password`/`verify_password`에만 둔다(현재 원문 저장 — 의도적 취약점, `docs/security/threat-model.md`에 기록)
+- 레이트리밋(인메모리): 로그인 5/분, 매치 신청 10/분, 챗봇 20/5분
+- 정원 초과 레이스는 `SELECT ... FOR UPDATE` / 유니크 제약으로 방지, 스코어링·레이팅은 서버에서만 계산
 - 에러는 `{"detail": {"code": "MATCH_FULL", "message": "..."}}` 형태, 스택트레이스/SQL 노출 금지
-- 로그에 토큰·비밀번호·좌표 마스킹, 로그인 실패·권한 거부는 보안 이벤트로 기록
 - 시크릿은 `.env` + `Settings`만, 레포 커밋 금지(유출 시 즉시 폐기)
-- 외부 URL 입력(지오코딩·이미지 등)은 스킴·호스트 화이트리스트, 내부망 IP 차단
 
-**CI 게이트(PR)**: `bandit -r app -ll`, `ruff check --select S app`, `pip-audit`, `gitleaks detect`. ZAP은 리포트까지만.
-**산출물**: 취약점 리포트 N건, STRIDE 위협 모델 1장, 라이브 데모 2~3개, 보안 체크리스트. 1인 1건 취약점 발표.
+**CI 게이트(PR)**: `bandit -r app -ll`, `ruff check --select S app`, `pip-audit`, `gitleaks detect`.
+**산출물**: 챗봇 위협 모델 1장, 공격 프롬프트 세트와 가드 전후 차단율·오탐률 표, 라이브 데모 2~3개(인젝션 차단, 개인정보 마스킹 등), 1인 1건 공격 시나리오 발표.
 
 ## 6. 챗봇 (`services/chatbot.py`, `POST /api/v1/chat` SSE)
 역할은 4가지: ① 자연어 → `/matches/recommended` 파라미터 추출 ② 추천 결과 설명 ③ 온보딩 티어 안내 ④ 규칙 FAQ.
@@ -82,9 +84,9 @@ Venue, Match(status: open→full→confirmed→playing→completed/canceled), Pa
 - 도구는 항상 요청자 JWT 권한으로 실행. 소유권 검사는 서버가 한다
 - `tool_choice`는 `auto` + 도구 `strict: true`(강제 `any`/`tool`은 400). 깊이는 `output_config.effort`(기본 `medium`), 파라미터 추출은 structured outputs
 - 시스템 프롬프트·도구 정의는 프롬프트 캐싱, 요청마다 바뀌는 값은 캐시 분기점 뒤에
-- 프롬프트 인젝션 대비: 도구 결과(공지·닉네임 등)는 데이터로만 취급·구분자로 감싸기, 챗봇 마크다운 렌더 시 HTML 비허용·링크는 자사 도메인만
+- 입력·출력 가드는 5절. 도구 결과(공지·닉네임 등)는 데이터로만 취급·구분자로 감싸기(간접 인젝션), 마크다운 렌더 시 HTML 비허용·링크는 자사 도메인만
 - **PII는 도구 응답 스키마에서 애초에 제외**(좌표·주소·이메일·실명). 거리는 "약 2km"로 반올림해서만 전달
-- 입력 길이·세션당 토큰 상한, `response.usage` 로깅, 인젝션 의심 입력은 보안 이벤트로 기록, 회귀 테스트는 `tests/security/test_chat_*.py`
+- 세션당 토큰 상한, `response.usage` 로깅
 - **LLM 장애 시 필터 UI로 degrade** — 챗봇 없이도 서비스가 완결돼야 한다. 대화 이력 30일 보관, 탈퇴 시 즉시 삭제
 
 ## 7. UX 원칙
@@ -112,5 +114,5 @@ cd frontend && pnpm install && pnpm dev && pnpm test && pnpm lint && pnpm typech
 
 ## 10. 일정 (14주)
 W1 기획·ERD / W2 레포·docker·CI / W3 인증 / W4 구장·공간 쿼리 / W5 매치 CRUD·상태 전이 / **W6 추천** / **W7 레이팅** / **W8 밸런서** /
-W9~11 프론트(온보딩·피드·상세·개설·매치룸·리뷰) / **W12 챗봇** / **W13 보안 진단(Red)** / **W14 보안 방어(Blue)·발표**.
-**버리는 순서**: 지도 뷰 → 매치룸 채팅 → 알림 → 챗봇 온보딩·FAQ. 알고리즘 3종, 챗봇의 검색·설명, 보안은 끝까지 지킨다.
+W9~11 프론트(온보딩·피드·상세·개설·매치룸·리뷰) / **W12 챗봇·가드 v0** / **W13 가드 공격(Red)** / **W14 가드 보강(Blue)·발표**.
+**버리는 순서**: 지도 뷰 → 매치룸 채팅 → 알림 → 챗봇 온보딩·FAQ. 알고리즘 3종, 챗봇의 검색·설명, 챗봇 가드는 끝까지 지킨다.

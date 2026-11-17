@@ -1,7 +1,7 @@
-// API 클라이언트. access 토큰은 메모리에, refresh 토큰만 localStorage에 둔다 (docs/security 위협 모델 기록 대상).
+// API 클라이언트. access 토큰 하나를 localStorage에 둔다 (refresh 없음, 만료되면 다시 로그인).
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
-const REFRESH_KEY = "teamup.refresh";
+const TOKEN_KEY = "teamup.token";
 
 export class ApiError extends Error {
   constructor(
@@ -16,25 +16,25 @@ export class ApiError extends Error {
 
 export interface Tokens {
   access_token: string;
-  refresh_token: string;
 }
 
-let accessToken: string | null = null;
-let refreshing: Promise<boolean> | null = null; // 동시에 401이 나도 refresh는 한 번만
-
-export function getStoredRefresh(): string | null {
+function readStoredToken(): string | null {
   try {
-    return localStorage.getItem(REFRESH_KEY);
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
-export function setTokens(t: Tokens | null) {
-  accessToken = t?.access_token ?? null;
+let accessToken: string | null = readStoredToken();
+
+export const hasToken = () => accessToken !== null;
+
+export function setToken(token: string | null) {
+  accessToken = token;
   try {
-    if (t) localStorage.setItem(REFRESH_KEY, t.refresh_token);
-    else localStorage.removeItem(REFRESH_KEY);
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
     // 저장소를 못 쓰는 환경(사생활 보호 모드 등)에서는 새로고침 시 로그아웃된다
   }
@@ -72,30 +72,10 @@ async function send(path: string, init: RequestInit, auth: boolean): Promise<Res
   return fetch(`${BASE_URL}${path}`, { ...init, headers });
 }
 
-async function refreshTokens(): Promise<boolean> {
-  const refresh = getStoredRefresh();
-  if (!refresh) return false;
-  const res = await send("/auth/refresh", { method: "POST", body: JSON.stringify({ refresh_token: refresh }) }, false);
-  if (!res.ok) {
-    setTokens(null);
-    return false;
-  }
-  setTokens((await res.json()) as Tokens);
-  return true;
-}
-
-export function refreshOnce(): Promise<boolean> {
-  refreshing ??= refreshTokens().finally(() => {
-    refreshing = null;
-  });
-  return refreshing;
-}
-
 export async function api<T>(path: string, init: RequestInit = {}, options: { auth?: boolean } = {}): Promise<T> {
   const auth = options.auth ?? true;
-  let res = await send(path, init, auth);
-  // access 만료: refresh로 한 번만 갱신해 재시도
-  if (res.status === 401 && auth && (await refreshOnce())) res = await send(path, init, auth);
+  const res = await send(path, init, auth);
+  if (res.status === 401 && auth) setToken(null); // 만료·위조 토큰은 버리고 다시 로그인하게 한다
   if (!res.ok) throw await toError(res);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
