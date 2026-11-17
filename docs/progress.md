@@ -46,6 +46,7 @@
 | 신청 | `POST/DELETE /matches/{id}/apply`(10/분), 주최자: `GET .../participations`, `POST .../participations/{pid}/accept·reject` | 주최자 전용 구간 있음 |
 | 진행 | `POST /matches/{id}/confirm·start·complete·cancel` | 주최자 |
 | 팀 | `POST .../teams/balance`, `GET .../teams`, `PUT .../teams` | 분배·수정은 주최자, 조회는 참가자 |
+| 챗봇 | `POST /chat` (SSE, DeepSeek, 읽기 전용 도구 4개: 추천 찾기·내 실력·매치 상세·버튼 제안) | 로그인, 20/5분, 키 없으면 503 |
 | 평가 | `PUT .../attendance`(주최자), `GET .../reviews/targets`·`POST .../reviews`(참가자), `POST .../rate`(주최자, 1회) | |
 | 내 활동 | `GET /me/summary`(참가 예정·완료 수, 매너 점수), `GET /me/matches`(참가 예정 매치), `GET /me/venues?sport=`(내 활동 지역 근처 구장) | 로그인, 항상 본인만. 구장 검색 좌표는 서버에 저장된 기준점만 쓴다 |
 | 종목 | `GET /sports`(팀 인원·포지션·티어 설명) | 로그인 |
@@ -73,12 +74,13 @@
 - 매치(`/matches`, `/matches/:id`, `/matches/new`): 종목 탭 목록 → 상세 페이지(모달 아님) → 신청·신청 취소. 주최자는 상세에서 신청자 수락·거절, 매치 취소.
 - 경기 진행(`pages/MatchProgress.tsx`, 상세 아래): 주최자는 확정 → 종료 버튼, 팀 자동 나누기·직접 조정(접전도 게이지), 출석 체크, 티어 반영. 참가자는 팀 보기와 함께 뛴 사람 평가(나보다 잘해요/비슷해요/나보다 아쉬워요 + 매너 신고). 반영이 끝나면 출석·평가 화면을 닫는다. 매치 열기는 내 활동 지역 근처 구장 중에서 고르고 정원은 서버가 정한다.
 - 내 정보(`/me`): 닉네임·이메일, 종목별 티어 배지·설명·추이(↑/→/↓), 활동 지역, 로그아웃.
+- 챗봇(`components/ChatPanel.tsx`): 종목 페이지에서는 규칙 FAQ 자리에 대화창(`SportChat`)이 들어가고, 추천 질문은 그 종목의 FAQ 질문(`GET /sports`의 `faq`)이다. 그 밖의 화면에는 떠 있는 "챗봇에게 묻기" 버튼(`ChatButton`, `AppLayout`)이 있다. 추천 찾기·설명, 실력 단계 안내, 규칙 FAQ. 버튼은 서버가 만든 앱 안 경로만 연다. 키가 없거나 실패하면 매치 목록 필터로 안내한다.
 - 공통 코드: `lib/useApi.ts`(GET 훅), `lib/sports.ts`(종목 규칙 캐시), `lib/labels.ts`(상태 문구), `components/MatchList.tsx`(종목 페이지에서도 쓰는 목록).
 - **없는 것**: 구장 등록(관리자) 화면. TanStack Query(`pnpm`이 없어 의존성 추가를 미룸, 지금은 `useEffect`로 불러온다).
 - 토큰을 localStorage에 두므로 XSS 시 탈취될 수 있고, 서버가 토큰을 무효화할 수 없다(만료까지 유효). 범위 축소로 받아들인 한계다.
 
 ## 테스트·검증
-- pytest 235개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). CI는 MariaDB 서비스(`teamup_test`)를 띄워 DB 테스트까지 모두 돌리고, 건너뛴 테스트가 하나라도 있으면 실패한다(DB 연결 실패를 놓치지 않게).
+- pytest 257개, ruff, mypy(strict), bandit(`-ll`) 통과. CI(check, gitleaks)는 백엔드를 바꾼 PR에서만 돈다(프론트 CI는 없음). CI는 MariaDB 서비스(`teamup_test`)를 띄워 DB 테스트까지 모두 돌리고, 건너뛴 테스트가 하나라도 있으면 실패한다(DB 연결 실패를 놓치지 않게).
 - DB가 필요한 테스트는 **테스트 전용 DB(`teamup_test`, `Settings.test_database_url`)**를 쓰고 항상 롤백한다. 개발 DB(`teamup`)의 데이터와 섞이지 않는다. pytest 시작 시 테스트 DB에 마이그레이션을 자동 적용한다.
 - DB 서버에 연결할 수 없으면 DB 테스트는 건너뛴다(컨테이너가 꺼져 있으면 조용히 건너뛰므로 `docker compose up -d db` 후 확인할 것).
 - 테스트 DB 주소가 `_test`로 끝나지 않거나 개발 DB와 같으면 pytest가 시작 전에 멈춘다.
@@ -108,7 +110,7 @@
 
 ### 종목
 - 농구는 PR #24 리뷰 중. 요청한 수정: `__init__.py`에서 `FAQ` 내보내기, `test_basketball_rules.py`, 색 토큰(`border-edge`, `bg-muted` 교체), 쓰지 않는 `tiers`·`matches` mock 삭제.
-- 풋살·배드민턴 티어 문구·FAQ가 프론트 `data.ts`와 백엔드 `faq.py`에 중복되어 있다(풋살은 FAQ 7개·티어 5개 문구가 일치함을 대조로 확인). API로 내려주기 전까지 두 곳을 함께 고쳐야 한다.
+- 규칙 FAQ는 백엔드 `faq.py` 한 곳에만 둔다(프론트 `data.ts`의 복사본은 지웠다). 질문은 `GET /sports`로 내려가 챗봇 추천 질문이 되고, 답은 챗봇이 같은 파일로 한다. 농구는 PR #24가 머지되면 FAQ 섹션을 `SportChat`으로 바꿔야 한다.
 - 종목 이름은 "풋살"로 통일했다(id는 `football` 유지). 풋살 폴더 `Page.tsx` 첫 줄 주석의 "축구/풋살"은 담당자 영역이라 남겨 두었다.
 - 농구 포지션을 팀 분배에 쓸지는 **보류**(농구 `RULES` TODO와 함께 결정).
 - 풋살 페이지 매치는 아직 mock(날짜가 고정 문자열). 담당자가 `data.ts`의 mock 대신 공통 `<MatchList sport="football" />`을 넣으면 된다(농구는 PR #24에서 이미 쓴다).
@@ -124,7 +126,6 @@
 - 로컬 개발 서버(Vite)는 `pnpm`이 없어서 `npx vite`로 띄웠다. 프론트 `lint`·`test` 스크립트도 아직 없다.
 
 ### 그 뒤
-- 챗봇(`services/chatbot.py`, SSE, 읽기 전용 도구)
 - 보안 진단(Red)과 방어(Blue): 취약점 리포트, STRIDE 위협 모델(`docs/security/threat-model.md`, 아직 없음), 라이브 데모, 체크리스트
 
 ## 로컬 실행 메모

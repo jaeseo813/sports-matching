@@ -14,6 +14,10 @@ from app.core.security_headers import SecurityHeadersMiddleware
 
 logger = logging.getLogger(__name__)
 
+# teamup.* 로거(보안 이벤트, 챗봇 토큰 사용량)는 INFO부터 남긴다. 다른 라이브러리는 기본(WARNING) 그대로
+logging.basicConfig(format="%(levelname)s %(name)s %(message)s")
+logging.getLogger("teamup").setLevel(logging.INFO)
+
 _SECURITY_STATUS: dict[int, SecurityEvent] = {
     401: "unauthorized",
     403: "forbidden",
