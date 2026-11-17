@@ -47,21 +47,20 @@ async def test_review_rules(api: AsyncClient, venue_id: int) -> None:
 
 async def test_only_host_can_rate_or_record_attendance(api: AsyncClient, venue_id: int) -> None:
     g = await start_game(api, venue_id)
-    for step in ("confirm", "start"):
+    for step in ("confirm", "complete"):
         await api.post(f"{g.base}/{step}", headers=g.host)
     body = {"attendances": [{"user_id": g.ids[1], "attended": False}]}
     assert (await api.put(f"{g.base}/attendance", json=body, headers=g.users[0])).status_code == 403
-    await api.post(f"{g.base}/complete", headers=g.host)
     assert (await api.post(f"{g.base}/rate", headers=g.users[0])).status_code == 403
 
 
-async def test_cannot_rate_before_completion_or_record_attendance_before_start(
+async def test_cannot_rate_or_record_attendance_before_completion(
     api: AsyncClient, venue_id: int
 ) -> None:
     g = await start_game(api, venue_id)
     body = {"attendances": [{"user_id": g.ids[1], "attended": True}]}
     early = await api.put(f"{g.base}/attendance", json=body, headers=g.host)
-    assert early.status_code == 409 and early.json()["detail"]["code"] == "MATCH_NOT_STARTED"
+    assert early.status_code == 409 and early.json()["detail"]["code"] == "MATCH_NOT_COMPLETED"
     not_done = await api.post(f"{g.base}/rate", headers=g.host)
     assert (
         not_done.status_code == 409 and not_done.json()["detail"]["code"] == "MATCH_NOT_COMPLETED"
@@ -70,7 +69,17 @@ async def test_cannot_rate_before_completion_or_record_attendance_before_start(
 
 async def test_attendance_rejects_unknown_participant(api: AsyncClient, venue_id: int) -> None:
     g = await start_game(api, venue_id)
-    for step in ("confirm", "start"):
+    for step in ("confirm", "complete"):
         await api.post(f"{g.base}/{step}", headers=g.host)
     body = {"attendances": [{"user_id": 999999, "attended": False}]}
     assert (await api.put(f"{g.base}/attendance", json=body, headers=g.host)).status_code == 404
+
+
+async def test_review_targets_only_for_participants(api: AsyncClient, venue_id: int) -> None:
+    assert (await api.get("/api/v1/matches/1/reviews/targets")).status_code == 401
+    g = await start_game(api, venue_id)
+    await finish(api, g)
+    outsider = await login(api, 9)
+    res = await api.get(f"{g.base}/reviews/targets", headers=outsider)
+    assert res.status_code == 403
+    assert "nickname" not in res.text  # 참가자 명단을 흘리지 않는다

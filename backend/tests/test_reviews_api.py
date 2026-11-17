@@ -38,11 +38,10 @@ async def start_game(api: AsyncClient, venue_id: int) -> Game:
 
 
 async def finish(api: AsyncClient, g: Game, *, attended: bool = True) -> None:
-    for step in ("confirm", "start"):
+    for step in ("confirm", "complete"):
         assert (await api.post(f"{g.base}/{step}", headers=g.host)).status_code == 200
     body = {"attendances": [{"user_id": uid, "attended": attended} for uid in g.ids]}
     assert (await api.put(f"{g.base}/attendance", json=body, headers=g.host)).status_code == 204
-    assert (await api.post(f"{g.base}/complete", headers=g.host)).status_code == 200
 
 
 def review(reviewee: int, verdict: str, flag: bool = False) -> dict[str, object]:
@@ -152,7 +151,7 @@ async def test_no_show_is_counted_and_can_be_corrected(
     api: AsyncClient, venue_id: int, session: AsyncSession
 ) -> None:
     g = await start_game(api, venue_id)
-    for step in ("confirm", "start"):
+    for step in ("confirm", "complete"):
         await api.post(f"{g.base}/{step}", headers=g.host)
     absent = g.ids[3]
     put = lambda attended: api.put(  # noqa: E731
@@ -166,3 +165,30 @@ async def test_no_show_is_counted_and_can_be_corrected(
     assert (await count()).scalar_one() == 1
     assert (await put(True)).status_code == 204  # 잘못 기록했다면 되돌린다
     assert (await count()).scalar_one() == 0
+
+
+async def test_review_targets_list_teammates_and_mark_reviewed(
+    api: AsyncClient, venue_id: int
+) -> None:
+    g = await start_game(api, venue_id)
+    await finish(api, g)
+    host_id, id2, id3, id4 = g.ids
+    u2 = g.users[0]
+    assert (
+        await api.post(f"{g.base}/reviews", json=review(id3, "better"), headers=u2)
+    ).status_code == 204
+    res = await api.get(f"{g.base}/reviews/targets", headers=u2)
+    assert res.status_code == 200
+    targets = {t["user_id"]: t["reviewed"] for t in res.json()}
+    assert targets == {host_id: False, id3: True, id4: False}  # 나 자신은 빠진다
+    match = (await api.get(g.base, headers=g.host)).json()
+    assert match["rated"] is False
+
+
+async def test_attended_players_still_count_and_see_teams(api: AsyncClient, venue_id: int) -> None:
+    g = await start_game(api, venue_id)
+    assert (await api.post(f"{g.base}/teams/balance", headers=g.host)).status_code == 200
+    await finish(api, g)  # 출석 처리로 accepted → attended
+    match = (await api.get(g.base, headers=g.users[0])).json()
+    assert match["joined"] == 4
+    assert (await api.get(f"{g.base}/teams", headers=g.users[0])).status_code == 200

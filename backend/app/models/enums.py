@@ -24,7 +24,6 @@ class MatchStatus(StrEnum):
     OPEN = "open"
     FULL = "full"
     CONFIRMED = "confirmed"
-    PLAYING = "playing"
     COMPLETED = "completed"
     CANCELED = "canceled"
 

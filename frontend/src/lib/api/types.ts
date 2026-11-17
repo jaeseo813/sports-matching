@@ -18,9 +18,10 @@ export interface MatchOut {
   min_players: number;
   tier_min: number;
   tier_max: number;
-  status: "open" | "full" | "confirmed" | "playing" | "completed" | "canceled";
+  status: "open" | "full" | "confirmed" | "completed" | "canceled";
   my_status: ParticipationStatus | null;
   is_host: boolean;
+  rated: boolean; // 레이팅 반영이 끝났으면 출석·평가를 바꿀 수 없다
   gender_policy: GenderPolicy;
 }
 
@@ -63,6 +64,7 @@ export interface VenueOut {
 
 export interface ParticipationOut {
   id: number;
+  user_id: number;
   nickname: string;
   status: ParticipationStatus;
 }
@@ -74,3 +76,22 @@ export interface LocationOut {
 }
 
 export type GenderPolicy = "any" | "male_only" | "female_only";
+
+export interface TeamsOut {
+  teams: { team_no: number; members: { user_id: number; nickname: string; tier: number; position: string | null }[] }[];
+  closeness: number; // 접전도 1~5
+  is_manual: boolean;
+}
+
+export type Verdict = "better" | "similar" | "worse";
+
+export interface ReviewTargetOut {
+  user_id: number;
+  nickname: string;
+  reviewed: boolean;
+}
+
+export interface RateOut {
+  applied: boolean;
+  updated: number;
+}

@@ -6,7 +6,7 @@ from app.models.enums import MatchStatus, ParticipationStatus
 from app.models.user import User
 from app.repositories.match import MatchRepository
 from app.repositories.review import DuplicateReviewError, ReviewRepository
-from app.schemas.match import AttendanceIn, RateOut, ReviewIn
+from app.schemas.match import AttendanceIn, RateOut, ReviewIn, ReviewTargetOut
 from app.services.skill import (
     PAIR_COOLDOWN_DAYS,
     PlayerSkill,
@@ -58,6 +58,25 @@ async def submit_review(
     await reviews.commit()
 
 
+async def list_review_targets(
+    matches: MatchRepository, reviews: ReviewRepository, user: User, match_id: int
+) -> list[ReviewTargetOut]:
+    """함께 뛴 참가자 목록과 내가 평가했는지. 참가자 본인만 볼 수 있다."""
+    if await matches.get_match(match_id) is None:
+        raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
+    statuses = await reviews.participant_statuses(match_id)
+    if statuses.get(user.id) not in _PLAYED:
+        raise _error(403, "FORBIDDEN", "경기에 참가한 사람만 볼 수 있습니다")
+    others = {uid for uid, st in statuses.items() if st in _PLAYED and uid != user.id}
+    done = {r.reviewee_id for r in await reviews.list_reviews(match_id) if r.reviewer_id == user.id}
+    names = await reviews.users(others)
+    return [
+        ReviewTargetOut(user_id=uid, nickname=names[uid].nickname, reviewed=uid in done)
+        for uid in sorted(others)
+        if uid in names
+    ]
+
+
 async def set_attendance(
     matches: MatchRepository,
     reviews: ReviewRepository,
@@ -70,8 +89,8 @@ async def set_attendance(
         raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
     if match.host_id != host.id:
         raise _error(403, "FORBIDDEN", "주최자만 할 수 있습니다")
-    if match.status not in (MatchStatus.PLAYING, MatchStatus.COMPLETED):
-        raise _error(409, "MATCH_NOT_STARTED", "경기가 시작된 뒤에만 출석을 기록할 수 있습니다")
+    if match.status is not MatchStatus.COMPLETED:
+        raise _error(409, "MATCH_NOT_COMPLETED", "끝난 경기만 출석을 기록할 수 있습니다")
     if match.rated_at is not None:
         raise _error(409, "REVIEW_CLOSED", "이미 레이팅에 반영된 경기입니다")
     ids = {a.user_id for a in data.attendances}

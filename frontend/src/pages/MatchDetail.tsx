@@ -7,6 +7,7 @@ import { formatWhen } from "../lib/format";
 import { genderPolicyLabel, matchStatusLabel, myStatusLabel, teamSizeLabel } from "../lib/labels";
 import { useSportRules } from "../lib/sports";
 import { useApi } from "../lib/useApi";
+import MatchProgress from "./MatchProgress";
 import { sports } from "../sports/registry";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -88,6 +89,7 @@ export default function MatchDetail() {
   const tierLabels = rules?.find((r) => r.id === m.sport)?.tier_labels ?? {};
   const active = m.status === "open" || m.status === "full" || m.status === "confirmed";
   const applied = m.my_status === "applied" || m.my_status === "accepted";
+  const played = m.my_status === "attended" || m.my_status === "no_show"; // 이미 뛴 경기: 신청 버튼을 보이지 않는다
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -162,7 +164,7 @@ export default function MatchDetail() {
               신청 취소
             </button>
           )
-        ) : (
+        ) : played ? null : (
           <button
             type="button"
             disabled={busy || m.status !== "open" || m.my_status === "rejected"}
@@ -175,7 +177,9 @@ export default function MatchDetail() {
         {!m.is_host && m.my_status === "applied" && <p className="mt-2 text-center text-sm text-muted">주최자가 수락하면 참가가 확정돼요.</p>}
       </section>
 
-      {m.is_host && <Applicants matchId={m.id} onChange={reload} />}
+      <MatchProgress m={m} onChange={reload} />
+      {/* 경기가 끝나면 출석 체크가 같은 명단을 보여 준다 */}
+      {m.is_host && active && <Applicants matchId={m.id} onChange={reload} />}
     </div>
   );
 }

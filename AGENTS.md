@@ -31,7 +31,7 @@ frontend/src/{pages,features,components/ui,lib/api}            docs/security/{th
 
 ## 4. 핵심 도메인
 **데이터**: User, UserLocation(활동 기준점 최대 2개, `POINT SRID 4326`, SPATIAL INDEX), UserSkill(종목별 rating/RD),
-Venue, Match(status: open→full→confirmed→playing→completed/canceled), Participation, PeerReview, TeamAssignment, `matching_weights`(가중치는 DB에).
+Venue, Match(status: open→full→confirmed→completed/canceled, 경기 중 단계 없음 — 경기는 앱 밖에서 하고 앱은 매칭과 경기 후 평가만), Participation, PeerReview, TeamAssignment, `matching_weights`(가중치는 DB에).
 
 **실력 모델**: 승패 Elo 대신 **상호 평가**(`better/similar/worse`)를 Glicko-2 변형으로 반영. 한 경기의 리뷰는 한 번의 rating period로 묶는다.
 - 초기값: 자기평가 티어 1~5 → rating 900/1100/1300/1500/1700 + `min(years,5)*15`, RD 300~350

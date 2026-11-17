@@ -99,17 +99,16 @@ async def test_manual_adjustment(api: AsyncClient, venue_id: int) -> None:
     assert denied.status_code == 403
 
 
-async def test_start_and_complete_flow(api: AsyncClient, venue_id: int) -> None:
+async def test_confirm_and_complete_flow(api: AsyncClient, venue_id: int) -> None:
     host, users, mid = await doubles_full(api, venue_id)
     base = f"/api/v1/matches/{mid}"
-    assert (await api.post(f"{base}/start", headers=host)).status_code == 409  # 확정 전
+    assert (await api.post(f"{base}/complete", headers=host)).status_code == 409  # 확정 전
     assert (await api.post(f"{base}/confirm", headers=host)).json() == {"status": "confirmed"}
-    assert (await api.post(f"{base}/start", headers=users[0])).status_code == 403
-    assert (await api.post(f"{base}/start", headers=host)).json() == {"status": "playing"}
+    assert (await api.post(f"{base}/complete", headers=users[0])).status_code == 403
+    assert (await api.post(f"{base}/complete", headers=host)).json() == {"status": "completed"}
     assert (
         await api.post(f"{base}/cancel", headers=host)
-    ).status_code == 409  # 진행 중엔 취소 불가
-    assert (await api.post(f"{base}/complete", headers=host)).json() == {"status": "completed"}
+    ).status_code == 409  # 끝난 경기는 취소 불가
 
 
 async def _futsal_venue(session: AsyncSession) -> int:

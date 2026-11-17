@@ -6,8 +6,8 @@ _ALLOWED: dict[MatchStatus, frozenset[MatchStatus]] = {
     MatchStatus.OPEN: frozenset({MatchStatus.FULL, MatchStatus.CONFIRMED, MatchStatus.CANCELED}),
     # 정원이 찼다가 참가자가 빠지면 다시 모집 중으로 돌아간다
     MatchStatus.FULL: frozenset({MatchStatus.OPEN, MatchStatus.CONFIRMED, MatchStatus.CANCELED}),
-    MatchStatus.CONFIRMED: frozenset({MatchStatus.PLAYING, MatchStatus.CANCELED}),
-    MatchStatus.PLAYING: frozenset({MatchStatus.COMPLETED}),
+    # 경기 중 단계는 두지 않는다: 확정된 경기가 끝나면 주최자가 바로 종료한다 (평가는 종료 뒤)
+    MatchStatus.CONFIRMED: frozenset({MatchStatus.COMPLETED, MatchStatus.CANCELED}),
     MatchStatus.COMPLETED: frozenset(),
     MatchStatus.CANCELED: frozenset(),
 }
