@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.4",
     "pyjwt>=2.8",
     "prometheus-client>=0.21",
+    "openai>=1.50",
 ]
 
 [dependency-groups]

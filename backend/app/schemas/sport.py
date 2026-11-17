@@ -10,3 +10,4 @@ class SportOut(BaseModel):
     players_per_team: list[int]
     positions: list[str]
     tier_labels: dict[int, str]
+    faq: list[str]  # 규칙 FAQ 질문 (답은 챗봇이 같은 faq.py로 한다)

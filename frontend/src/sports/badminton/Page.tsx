@@ -1,10 +1,10 @@
-import { ChevronDown } from "lucide-react";
 import MatchList from "../../components/MatchList";
 import type { SportOut } from "../../lib/api/types";
 import { teamSizeLabel } from "../../lib/labels";
+import { SportChat } from "../../components/ChatPanel";
 import { useSportRules } from "../../lib/sports";
 import { badminton } from ".";
-import { faq, formatNotes } from "./data";
+import { formatNotes } from "./data";
 
 // 배드민턴 담당 영역: 이 폴더(src/sports/badminton) 안에서만 작업한다.
 // 팀 인원·티어 설명은 서버 규칙(GET /sports)을 쓴다. 구성은 풋살 페이지와 같다.
@@ -95,28 +95,6 @@ function TierGuide({ rules }: { rules: SportOut | undefined }) {
   );
 }
 
-function RuleFaq() {
-  return (
-    <section aria-labelledby="faq">
-      <h2 id="faq" className="text-xl font-extrabold">배드민턴 규칙 FAQ</h2>
-      <p className="mt-1 text-sm text-muted">방장이 정한 규칙이 있으면 그쪽이 우선이에요.</p>
-      <ul className="mt-3 space-y-2">
-        {faq.map(({ q, a }) => (
-          <li key={q}>
-            <details className="group rounded-xl border border-edge bg-white">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-bold [&::-webkit-details-marker]:hidden">
-                {q}
-                <ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180" />
-              </summary>
-              <p className="px-3 pb-3 text-sm leading-relaxed text-muted">{a}</p>
-            </details>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export default function Page() {
   const rules = useSportRules()?.find((s) => s.id === badminton.id);
 
@@ -130,7 +108,7 @@ export default function Page() {
       </section>
       <div className="grid gap-10 md:grid-cols-2">
         <TierGuide rules={rules} />
-        <RuleFaq />
+        <SportChat sport={badminton.id} />
       </div>
     </div>
   );

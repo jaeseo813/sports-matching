@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     access_token_minutes: int = (
         60 * 24
     )  # refresh 토큰 없이 access 하나만 쓴다 (만료되면 다시 로그인)
-    anthropic_api_key: str = ""
+    # 챗봇 LLM: DeepSeek (OpenAI 호환 API, openai 패키지의 AsyncOpenAI에 base_url만 바꿔 쓴다)
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-flash"
     kakao_map_key: str = ""
 
     @property

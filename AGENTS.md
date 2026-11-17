@@ -14,7 +14,7 @@
 - 백엔드: Python 3.12, FastAPI(async), MariaDB 11(공간 기능), SQLAlchemy 2.0 async(`asyncmy`) + Alembic, Pydantic v2
 - 인증: JWT access 토큰 하나(24시간, refresh·서버 세션 없음). 비밀번호는 현재 원문 저장(5절). Redis 없음(레이트리밋은 인메모리)
 - 프론트(가정): React 19 + Vite + TS, TanStack Query, Zustand, Tailwind + shadcn/ui, Kakao Maps, react-hook-form + zod
-- 챗봇: `anthropic` SDK(`AsyncAnthropic`), 모델 `claude-opus-5-5`(날짜 접미사 금지), SSE 스트리밍, tool use
+- 챗봇: DeepSeek API(OpenAI 호환, `openai` 패키지의 `AsyncOpenAI` + `base_url`), 모델 `deepseek-flash`, SSE 스트리밍, tool calls. 키·주소·모델은 `Settings`(`deepseek_*`)에서만 읽는다
 - 보안 도구: bandit, ruff(S), pip-audit, gitleaks (웹 스캐너 ZAP·Burp는 범위 밖)
 - 인프라: docker-compose(db, api, 모니터링 프로필에 Prometheus·Grafana), GitHub Actions(lint + test + 보안 스캔 게이트)
 
@@ -80,14 +80,17 @@ Venue, Match(status: open→full→confirmed→completed/canceled, 경기 중 �
 
 ## 6. 챗봇 (`services/chatbot.py`, `POST /api/v1/chat` SSE)
 역할은 4가지: ① 자연어 → `/matches/recommended` 파라미터 추출 ② 추천 결과 설명 ③ 온보딩 티어 안내 ④ 규칙 FAQ.
-**순위는 6절 규칙 스코어링이 정하고, 챗봇은 정하지 않는다.**
+**순위는 4절 규칙 스코어링이 정하고, 챗봇은 정하지 않는다.**
 - 도구는 **전부 읽기 전용**: `search_matches`(`user_id`는 서버가 JWT에서 주입), `get_my_profile`, `get_match_detail`, `suggest_action`(버튼 제안만)
 - 도구는 항상 요청자 JWT 권한으로 실행. 소유권 검사는 서버가 한다
-- `tool_choice`는 `auto` + 도구 `strict: true`(강제 `any`/`tool`은 400). 깊이는 `output_config.effort`(기본 `medium`), 파라미터 추출은 structured outputs
-- 시스템 프롬프트·도구 정의는 프롬프트 캐싱, 요청마다 바뀌는 값은 캐시 분기점 뒤에
+- 생각 모드는 끈다(`extra_body={"thinking": {"type": "disabled"}}`, 기본이 켜짐이라 지연·비용이 늘어난다). `tool_choice`는 `auto`
+- 도구 인자는 **서버에서 Pydantic으로 다시 검증**한다(LLM이 준 값은 입력으로 취급). `strict` 도구는 베타(`/beta` 주소 필요)라 쓰지 않는다
+- 파라미터 추출은 JSON 출력(`response_format={"type": "json_object"}`, 프롬프트에 "json"과 예시 포함). 응답이 비어 올 수 있으니 빈 값·파싱 실패를 처리한다
+- 캐싱은 자동(접두사 일치). 시스템 프롬프트·도구 정의를 앞에 고정하고 요청마다 바뀌는 값은 뒤에 둔다
 - 입력·출력 가드는 5절. 도구 결과(공지·닉네임 등)는 데이터로만 취급·구분자로 감싸기(간접 인젝션), 마크다운 렌더 시 HTML 비허용·링크는 자사 도메인만
 - **PII는 도구 응답 스키마에서 애초에 제외**(좌표·주소·이메일·실명). 거리는 "약 2km"로 반올림해서만 전달
-- 세션당 토큰 상한, `response.usage` 로깅
+- SSE 이벤트는 `status`(도구 진행) / `action`(버튼, 주소는 서버가 만든다) / `message`(출력 가드를 통과한 답, 한 번에) / `error` / `done`. 토큰 단위로 흘리지 않는다(가드 전에 노출되므로)
+- 세션당 토큰 상한, `usage` 로깅(캐시 적중 `prompt_cache_hit_tokens` 포함). 스트리밍은 `stream_options={"include_usage": true}`로 마지막 청크에서 usage를 받는다
 - **LLM 장애 시 필터 UI로 degrade** — 챗봇 없이도 서비스가 완결돼야 한다. 대화 이력 30일 보관, 탈퇴 시 즉시 삭제
 
 ## 7. UX 원칙
@@ -96,7 +99,7 @@ Venue, Match(status: open→full→confirmed→completed/canceled, 경기 중 �
 
 ## 8. 개인정보
 정확한 현재 위치 상시 수집 금지(등록한 기준점만). 타인에게는 거리를 "약 2km"로 반올림, 좌표·주소 원본 노출 금지.
-탈퇴 시 개인정보 삭제·리뷰 익명화 보존. 더미 데이터에 실명·실주소 금지. 미성년자 가입 제외. 외부 LLM에 개인정보 전송 금지.
+탈퇴 시 개인정보 삭제·리뷰 익명화 보존. 더미 데이터에 실명·실주소 금지. 미성년자 가입 제외. 외부 LLM(DeepSeek)에 개인정보 전송 금지 — 입력 가드에서 걸러 낸 뒤에 보낸다.
 
 ## 9. 개발 규칙
 ```bash
@@ -108,7 +111,7 @@ cd frontend && pnpm install && pnpm dev && pnpm test && pnpm lint && pnpm typech
 - 한국어 주석/커밋 허용, 식별자는 영어. Conventional Commits, 브랜치 `feat/<이슈번호>-<설명>`, `main` 직접 푸시 금지
 - 마이그레이션은 `alembic revision --autogenerate` 후 **생성 파일을 반드시 검토**(공간 타입 오류 잦음)
 - 환경변수는 `Settings`(pydantic-settings)로만, `os.environ` 직접 접근 금지
-- async 코드에서 블로킹 I/O 금지(`httpx.AsyncClient`, `AsyncAnthropic`)
+- async 코드에서 블로킹 I/O 금지(`httpx.AsyncClient`, `AsyncOpenAI`)
 - 새 엔드포인트는 인가 의존성 + 보안 테스트 1개 필수
 - 라우터 테스트는 happy path + 주요 에러만, 커버리지 목표 없음
 - 알고리즘 가중치·공식 변경 시 같은 시드 데이터로 before/after 추천 결과를 PR에 기록

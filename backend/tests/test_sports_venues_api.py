@@ -22,6 +22,11 @@ async def test_sports_lists_rules_from_registry(api: AsyncClient) -> None:
     assert set(by_id) == {"basketball", "football", "badminton"}
     assert by_id["badminton"]["players_per_team"] == [1, 2]
     assert sorted(by_id["badminton"]["tier_labels"]) == ["1", "2", "3", "4", "5"]
+    # 규칙 FAQ는 질문만 내려준다 (챗봇 추천 질문, 답은 챗봇이 같은 faq.py로)
+    from app.sports.football import FAQ
+
+    assert by_id["football"]["faq"] == [q for q, _ in FAQ]
+    assert all(isinstance(q, str) for q in by_id["badminton"]["faq"])
 
 
 async def test_venues_near_me_needs_location(api: AsyncClient, venue_id: int) -> None:

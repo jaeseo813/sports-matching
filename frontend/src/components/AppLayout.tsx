@@ -1,6 +1,7 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { CalendarDays, LayoutDashboard, User } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { ChatButton } from "./ChatPanel";
 
 const tabs = [
   { to: "/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -11,6 +12,8 @@ const tabs = [
 // 데스크톱: 상단 내비게이션 / 모바일: 하단 탭바
 export default function AppLayout() {
   const { user, loading, logout } = useAuth();
+  // 종목 페이지는 페이지 안에 대화창(SportChat)이 있어 떠 있는 버튼을 숨긴다. 숨기기만 해서 대화는 이어진다
+  const onSportPage = useLocation().pathname.startsWith("/sports/");
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-edge bg-white/90 backdrop-blur">
@@ -52,6 +55,10 @@ export default function AppLayout() {
       <main className="mx-auto max-w-6xl space-y-10 px-4 pb-28 pt-6 md:pb-12">
         <Outlet />
       </main>
+
+      <div hidden={onSportPage}>
+        <ChatButton />
+      </div>
 
       <nav
         aria-label="하단 메뉴"
