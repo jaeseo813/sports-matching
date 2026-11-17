@@ -16,7 +16,7 @@
 - 프론트(가정): React 19 + Vite + TS, TanStack Query, Zustand, Tailwind + shadcn/ui, Kakao Maps, react-hook-form + zod
 - 챗봇: `anthropic` SDK(`AsyncAnthropic`), 모델 `claude-opus-5-5`(날짜 접미사 금지), SSE 스트리밍, tool use
 - 보안 도구: bandit, ruff(S), pip-audit, gitleaks (웹 스캐너 ZAP·Burp는 범위 밖)
-- 인프라: docker-compose(db, api), GitHub Actions(lint + test + 보안 스캔 게이트)
+- 인프라: docker-compose(db, api, 모니터링 프로필에 Prometheus·Grafana), GitHub Actions(lint + test + 보안 스캔 게이트)
 
 ## 3. 구조 규칙
 ```
@@ -54,6 +54,7 @@ Venue, Match(status: open→full→confirmed→playing→completed/canceled), Pa
 
 ## 5. 보안 (최종 목표: 챗봇 가드)
 웹해킹 전반이 아니라 **챗봇 입력 가드·출력 가드**를 만들고, 직접 공격해 우회하고 막는 과정을 학습한다. 웹 쪽은 아래 기본 규칙까지만 지킨다.
+세 파트로 나눠 맡는다: **A 챗봇 가드레일 / B 보안 대시보드(Grafana) / C RBAC 정책**. 파트별 범위·할 일과 세 파트를 잇는 보안 이벤트(`core/security_events.py` → `/metrics` → Grafana)는 `docs/security/README.md`.
 **방식**: 챗봇 v0 → 공격(Red: 공격 프롬프트 세트로 우회 시도, `docs/security/findings/NNN-*.md`에 재현/영향/증거/심각도) → 방어(Blue: 가드 보강 → 같은 세트로 재검증 → `tests/security/test_chat_*.py` 회귀 테스트).
 공격 실습은 **우리 소유 로컬·스테이징에서만**, **외부 공개 배포 금지**, 실제 개인정보 입력 금지(더미 데이터만). 위협 모델은 `docs/security/threat-model.md`.
 
