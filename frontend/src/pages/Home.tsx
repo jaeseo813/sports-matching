@@ -84,7 +84,7 @@ export default function Home() {
               <span className="bg-lime px-1">경기는 열려 있어요</span>
             </h1>
             <p className="mt-6 max-w-[36ch] text-lg leading-relaxed text-muted">
-              가까운 곳에서 실력이 비슷한 사람들과 팀을 이뤄요. 농구, 축구/풋살, 배드민턴을 지원해요.
+              가까운 곳에서 실력이 비슷한 사람들과 팀을 이뤄요. 농구, 풋살, 배드민턴을 지원해요.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/matches" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-night px-7 font-bold text-lime hover:opacity-90 active:scale-[0.98]">
