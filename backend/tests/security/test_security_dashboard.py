@@ -11,10 +11,11 @@ from typing import Any, get_args
 
 from app.core.security_events import SecurityEvent
 
-_DASHBOARD = (
-    Path(__file__).resolve().parents[3] / "infra/monitoring/grafana/dashboards/security.json"
-)
-_EVENT_MATCHER = re.compile(r'event\s*(=~|=)\s*"([^"]*)"')
+_MONITORING = Path(__file__).resolve().parents[3] / "infra/monitoring"
+_DASHBOARD = _MONITORING / "grafana/dashboards/security.json"
+_ALERTS = _MONITORING / "prometheus/alerts.yml"
+_EVENT_MATCHER = re.compile(r'event\s*(=~|!~|!=|=)\s*"([^"]*)"')
+_GROUP = re.compile(r"\(([^()]*)\)")
 
 
 @cache
@@ -44,17 +45,35 @@ def _datasource_uids() -> list[str]:
     return uids
 
 
+def _alert_exprs() -> list[str]:
+    # PyYAML은 직접 의존성이 아니라서 한 줄짜리 expr만 읽는다(규칙 파일도 한 줄로 쓴다).
+    return re.findall(r"^\s*expr:\s*(.+?)\s*$", _ALERTS.read_text(encoding="utf-8"), re.M)
+
+
+def _expand(pattern: str) -> list[str]:
+    """정규식의 (a|b) 묶음과 맨 바깥 | 를 갈래별 패턴으로 펼친다. 갈래 하나의 오타도 잡기 위해서다."""
+    group = _GROUP.search(pattern)
+    if group:
+        head, tail = pattern[: group.start()], pattern[group.end() :]
+        return [x for alt in group.group(1).split("|") for x in _expand(head + alt + tail)]
+    return pattern.split("|")
+
+
 def _event_values(exprs: list[str]) -> set[str]:
-    """expr 안의 event 라벨 조건이 가리키는 값. 정규식(=~)은 맞는 Literal 값으로 풀고, 하나도 안 맞으면 원문을 남긴다."""
+    """expr 안의 event 라벨 조건이 가리키는 값.
+
+    정규식(=~, !~)은 갈래마다 맞는 Literal 값으로 풀고, 어떤 값과도 안 맞는 갈래는 원문을 남겨 실패하게 한다.
+    """
     known = set(get_args(SecurityEvent))
     used: set[str] = set()
     for expr in exprs:
         for op, value in _EVENT_MATCHER.findall(expr):
-            if op == "=":
+            if op in ("=", "!="):
                 used.add(value)
                 continue
-            matched = {e for e in known if re.fullmatch(value, e)}
-            used |= matched or {value}
+            for branch in _expand(value):
+                matched = {e for e in known if re.fullmatch(branch, e)}
+                used |= matched or {branch}
     return used
 
 
@@ -94,3 +113,16 @@ def test_exprs_have_balanced_brackets() -> None:
             elif ch in pairs:
                 assert stack and stack.pop() == pairs[ch], expr
         assert not stack, expr
+
+
+def test_event_matcher_catches_typos() -> None:
+    known = set(get_args(SecurityEvent))
+    assert not _event_values(['x{event=~"chat_(input|outptu)_blocked"}']) <= known
+    assert not _event_values(['x{event!="forbiden"}']) <= known
+    assert not _event_values(['x{event!~"forbiden|unauthorized"}']) <= known
+
+
+def test_alert_rules_use_known_events() -> None:
+    exprs = _alert_exprs()
+    assert exprs, "alerts.yml에서 expr를 못 찾았다"
+    assert _event_values(exprs) <= set(get_args(SecurityEvent))

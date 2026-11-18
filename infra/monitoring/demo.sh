@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 보안 대시보드 라이브 데모: 공격 요청을 보내 Grafana 그래프가 바로 올라가는 걸 보여 준다.
 # 로컬 API + 시드 데이터에서만 쓴다(더미 계정과 일부러 틀린 비밀번호만 사용).
+# 받은 시드 계정 토큰은 ~/.cache/teamup-demo-token 에 둔다(24시간 유효, 데모 뒤 지워도 된다).
 #
 #   bash infra/monitoring/demo.sh prepare   # 발표 전에 한 번 (API를 띄운 뒤)
 #   (1분 기다린 뒤)
@@ -15,9 +16,28 @@ set -euo pipefail
 API=${API:-http://127.0.0.1:8000/api/v1}
 EMAIL=${DEMO_EMAIL:-s1@seed.teamup.test}       # 시드 계정 (scripts/seed_dev.py)
 PASSWORD=${DEMO_PASSWORD:-password123}         # 시드 계정 공용 더미 비밀번호
-TOKEN_FILE=${TMPDIR:-/tmp}/teamup-demo-token
+TOKEN_FILE=${DEMO_TOKEN_FILE:-$HOME/.cache/teamup-demo-token}  # 공유 /tmp를 피해 내 홈 아래에
+GRAFANA=${GRAFANA_URL:-http://127.0.0.1:3000}
+PY=$(command -v python3 || command -v python || true)
+[ -n "$PY" ] || { echo "python3(또는 python)이 필요합니다." >&2; exit 1; }
 
-status() { curl -s -o /dev/null -w "%{http_code}" "$@"; }
+status() { curl -s -o /dev/null -w "%{http_code}" "$@" || true; }
+
+# JSON 응답에서 값 하나를 꺼낸다. API가 꺼졌거나 오류 응답이면 빈 문자열(스크립트를 죽이지 않는다).
+json_pick() {
+  "$PY" -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+if sys.argv[1] == "token":
+    print(data.get("access_token", "") if isinstance(data, dict) else "")
+elif isinstance(data, list):
+    ids = [m["id"] for m in data if isinstance(m, dict) and not m.get("is_host", True)]
+    print(ids[0] if ids else "")
+' "$1"
+}
 
 bad_login() {
   status -X POST "$API/auth/login" -H 'content-type: application/json' \
@@ -26,10 +46,7 @@ bad_login() {
 
 # 요청자가 주최자가 아닌 매치 하나 (주최자 전용 동작을 시도해 403을 낸다)
 pick_match() {
-  curl -s "$API/matches?limit=50" -H "authorization: Bearer $1" | python3 -c '
-import json, sys
-ids = [m["id"] for m in json.load(sys.stdin) if not m["is_host"]]
-print(ids[0] if ids else "")'
+  { curl -s "$API/matches?limit=50" -H "authorization: Bearer $1" || true; } | json_pick match
 }
 
 forbidden() {
@@ -38,13 +55,14 @@ forbidden() {
 
 prepare() {
   echo "▶ 예열: 시드 계정으로 로그인해 토큰을 받아 둔다"
-  token=$(curl -s -X POST "$API/auth/login" -H 'content-type: application/json' \
-    -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" |
-    python3 -c 'import json,sys; print(json.load(sys.stdin).get("access_token",""))')
+  token=$({ curl -s -X POST "$API/auth/login" -H 'content-type: application/json' \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" || true; } | json_pick token)
   if [ -z "$token" ]; then
     echo "로그인 실패. API가 떠 있는지, 시드 데이터가 있는지(uv run python -m scripts.seed_dev) 확인하세요." >&2
     exit 1
   fi
+  mkdir -p "$(dirname "$TOKEN_FILE")"
+  rm -f "$TOKEN_FILE"
   (umask 077 && printf '%s' "$token" >"$TOKEN_FILE")
   match=$(pick_match "$token")
   [ -n "$match" ] || { echo "주최자가 아닌 매치가 없습니다. 시드 데이터를 확인하세요." >&2; exit 1; }
@@ -76,7 +94,7 @@ run() {
   echo "③ 남이 연 매치 취소 12회 (forbidden, 주최자 전용)"
   for _ in $(seq 12); do printf " %s" "$(forbidden "$token" "$match")"; done
   echo
-  echo "대시보드: http://127.0.0.1:3000/d/teamup-security  경보: http://127.0.0.1:9090/alerts"
+  echo "대시보드: $GRAFANA/d/teamup-security  경보: http://127.0.0.1:9090/alerts"
 }
 
 case "${1:-run}" in

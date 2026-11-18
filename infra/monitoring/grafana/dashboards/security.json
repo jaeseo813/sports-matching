@@ -240,7 +240,7 @@
           "unit": "short",
           "decimals": 0,
           "min": 0,
-          "noValue": "0"
+          "noValue": "데이터 없음"
         },
         "overrides": []
       },
@@ -345,7 +345,7 @@
           "unit": "short",
           "decimals": 0,
           "min": 0,
-          "noValue": "0"
+          "noValue": "데이터 없음"
         },
         "overrides": []
       },

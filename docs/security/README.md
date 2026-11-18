@@ -54,11 +54,14 @@ cd backend && uv run uvicorn app.main:app --reload
 # 2) 모니터링 스택
 docker compose --profile monitoring up -d
 ```
-- Grafana: http://127.0.0.1:3000 , 아이디 `admin`, 비밀번호는 `.env`의 `GRAFANA_ADMIN_PASSWORD`(없으면 `change-me` — 바꿔서 쓴다). 익명 접속은 꺼져 있다.
-  비밀번호는 **Grafana를 처음 띄울 때만** 적용된다. 나중에 바꾸려면 `docker compose --profile monitoring down -v`로 `grafana_data` 볼륨을 지우고 다시 띄운다.
-- 수집 확인: http://127.0.0.1:9090/targets 에서 `teamup-api`가 `UP`. API가 꺼져 있으면 `DOWN`이고 대시보드 패널은 비어 보인다.
+- Grafana: http://127.0.0.1:3000 , 아이디 `admin`, 비밀번호는 `.env`의 `GRAFANA_ADMIN_PASSWORD`(없으면 `change-me`). 익명 접속은 꺼져 있다.
+  비밀번호는 **Grafana를 처음 띄울 때만** 적용되므로 `.env`에 먼저 넣고 띄운다. 이미 띄운 뒤 바꾸려면:
+  `docker compose exec grafana grafana cli admin reset-admin-password <새 비밀번호>`
+  (`docker compose down -v`는 쓰지 않는다 — DB 볼륨 `db_data`까지 지워진다.)
+- 수집 확인: http://127.0.0.1:9090/targets 에서 `teamup-api`가 `UP`. API가 꺼져 있으면 `DOWN`이고, 대시보드는 "API 수집 상태"가 빨간 "수집 중단", 나머지 패널은 비거나 "데이터 없음"이 된다.
+- **Linux(Docker Desktop이 아닌 Docker Engine)**: 컨테이너가 호스트의 `127.0.0.1`에 닿지 않아 계속 `DOWN`이다. uvicorn을 docker 브리지 주소로 띄운다: `uv run uvicorn app.main:app --reload --host 172.17.0.1` (`ip addr show docker0`로 주소 확인). `0.0.0.0`은 API와 `/metrics`가 같은 네트워크에 열리므로 쓰지 않는다. macOS·Windows(WSL2 포함) Docker Desktop은 그대로 된다.
 - 3000번(또는 9090번) 포트를 이미 쓰고 있으면 `docker-compose.yml`에서 **왼쪽 포트만** 바꾼다(예: `127.0.0.1:3001:3000`).
-- 끄기: `docker compose --profile monitoring down`
+- 끄기: `docker compose stop prometheus grafana` (`--profile monitoring down`은 DB까지 멈춘다)
 
 - 대시보드 **TeamUp 보안 이벤트** (http://127.0.0.1:3000/d/teamup-security, `infra/monitoring/grafana/dashboards/security.json`): 15분 범위, 5초 새로고침.
 
@@ -75,7 +78,7 @@ docker compose --profile monitoring up -d
   대시보드는 파일로만 관리한다(화면에서 저장 불가). 고치려면 화면에서 수정 → JSON 내보내기 → 이 파일에 커밋, 데이터소스 uid는 `teamup-prometheus` 유지.
 - 경보 규칙 (`infra/monitoring/prometheus/alerts.yml`, 확인은 http://127.0.0.1:9090/alerts): 1분 안에 로그인 실패 5회 이상 `LoginFailureBurst`, 403 10회 이상 `ForbiddenBurst`. 알림 채널(메일·슬랙)은 없다.
   로그인은 IP당 1분 5회 제한이라 한 IP에서는 로그인 실패가 1분에 5회까지만 쌓인다(그 뒤는 `rate_limited`).
-- 테스트 `tests/security/test_security_dashboard.py`: 대시보드가 쓰는 `event` 값이 `SecurityEvent` Literal에 있는지, 카운터를 `increase`/`rate`로만 쓰는지, PromQL 괄호 짝 등을 검사한다. **Literal의 이벤트 이름을 바꾸면 이 테스트가 실패하니 대시보드도 같이 고친다.**
+- 테스트 `tests/security/test_security_dashboard.py`: 대시보드가 쓰는 `event` 값이 `SecurityEvent` Literal에 있는지, 카운터를 `increase`/`rate`로만 쓰는지, PromQL 괄호 짝, 경보 규칙의 이벤트 이름 등을 검사한다. **Literal의 이벤트 이름을 바꾸면 이 테스트가 실패하니 대시보드와 경보 규칙(`alerts.yml`, 같은 테스트가 검사)도 같이 고친다.**
 
 **라이브 데모** (`infra/monitoring/demo.sh`, 시드 데이터 필요: `cd backend && uv run python -m scripts.seed_dev`)
 1. 발표 전: API와 모니터링 스택을 띄우고 `bash infra/monitoring/demo.sh prepare`.
