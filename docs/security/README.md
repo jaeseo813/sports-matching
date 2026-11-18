@@ -5,7 +5,7 @@
 | 파트 | 담당 | 주 작업 위치 |
 |---|---|---|
 | A. 챗봇 가드레일 | (미정) | `backend/app/services/chat_guard.py`, `backend/tests/security/test_chat_*.py` |
-| B. 보안 대시보드 (Grafana) | (미정) | `infra/monitoring/`(새로 만듦), `docker-compose.yml`의 `monitoring` 프로필 |
+| B. 보안 대시보드 (Grafana) | 송수한 | `infra/monitoring/`(새로 만듦), `docker-compose.yml`의 `monitoring` 프로필 |
 | C. RBAC 정책 | (미정) | `backend/app/api/deps.py`, `backend/app/services/*`의 권한 검사, `docs/security/rbac.md`(새로 만듦) |
 
 ## 세 파트를 잇는 약속: 보안 이벤트
@@ -43,7 +43,22 @@
 
 **목표**: 보안 이벤트를 한눈에 보는 대시보드. 발표 라이브 데모(공격 → 그래프에 바로 뜸)에 쓴다.
 
-**지금 있는 것**: `GET /metrics`에 `teamup_security_events_total`이 나온다. Prometheus·Grafana는 아직 없다.
+**지금 있는 것**
+- `docker-compose.yml`의 `monitoring` 프로필에 Prometheus(`127.0.0.1:9090`)·Grafana(`127.0.0.1:3000`). 설정은 `infra/monitoring/`.
+- Prometheus는 5초마다 `host.docker.internal:8000/metrics`(로컬 uvicorn)를 수집한다(job `teamup-api`). Grafana 데이터소스 uid는 `teamup-prometheus`.
+
+**실행**
+```bash
+# 1) API를 로컬에서 띄운다 (9절)
+cd backend && uv run uvicorn app.main:app --reload
+# 2) 모니터링 스택
+docker compose --profile monitoring up -d
+```
+- Grafana: http://127.0.0.1:3000 , 아이디 `admin`, 비밀번호는 `.env`의 `GRAFANA_ADMIN_PASSWORD`(없으면 `change-me` — 바꿔서 쓴다). 익명 접속은 꺼져 있다.
+  비밀번호는 **Grafana를 처음 띄울 때만** 적용된다. 나중에 바꾸려면 `docker compose --profile monitoring down -v`로 `grafana_data` 볼륨을 지우고 다시 띄운다.
+- 수집 확인: http://127.0.0.1:9090/targets 에서 `teamup-api`가 `UP`. API가 꺼져 있으면 `DOWN`이고 대시보드 패널은 비어 보인다.
+- 3000번(또는 9090번) 포트를 이미 쓰고 있으면 `docker-compose.yml`에서 **왼쪽 포트만** 바꾼다(예: `127.0.0.1:3001:3000`).
+- 끄기: `docker compose --profile monitoring down`
 
 **할 일**
 1. `docker-compose.yml`에 `monitoring` 프로필로 Prometheus·Grafana 추가(`127.0.0.1`에만 열기). 기본 `docker compose up -d`는 지금처럼 DB만 뜨게 둔다.

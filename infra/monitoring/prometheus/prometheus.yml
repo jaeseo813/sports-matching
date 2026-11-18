@@ -1,0 +1,14 @@
+# 보안 대시보드(파트 B)용 Prometheus 설정.
+# 로컬에서 uvicorn으로 띄운 API(호스트 8000번)의 /metrics를 수집한다.
+global:
+  scrape_interval: 5s      # 데모에서 그래프가 빨리 바뀌도록 짧게
+  evaluation_interval: 5s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: teamup-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
