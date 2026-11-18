@@ -60,14 +60,35 @@ docker compose --profile monitoring up -d
 - 3000번(또는 9090번) 포트를 이미 쓰고 있으면 `docker-compose.yml`에서 **왼쪽 포트만** 바꾼다(예: `127.0.0.1:3001:3000`).
 - 끄기: `docker compose --profile monitoring down`
 
-**할 일**
-1. `docker-compose.yml`에 `monitoring` 프로필로 Prometheus·Grafana 추가(`127.0.0.1`에만 열기). 기본 `docker compose up -d`는 지금처럼 DB만 뜨게 둔다.
-   API를 로컬 uvicorn으로 띄우면 Prometheus 수집 대상은 `host.docker.internal:8000`.
-2. 설정은 `infra/monitoring/`에 파일로 두고 레포에 커밋(Prometheus 설정, Grafana 데이터소스·대시보드 provisioning JSON). Grafana 관리자 비밀번호는 `.env`로.
-3. 패널 제안: 이벤트 종류별 추이, 로그인 실패(`code="INVALID_CREDENTIALS"`) 급증, 403이 많은 route, 레이트리밋, 챗봇 가드 차단 사유별 건수.
-   챗봇 **차단율**을 그리려면 전체 요청 수 카운터가 필요하다 — 챗봇 본체를 만들 때 A와 함께 추가한다.
-4. (선택) 경보 규칙: 1분 내 로그인 실패 N회 이상 등.
-5. `/metrics`가 인증 없이 열려 있는 점은 C와 같이 정한다(내부망만 허용 / 토큰 / 그대로 두고 위협 모델에 기록).
+- 대시보드 **TeamUp 보안 이벤트** (http://127.0.0.1:3000/d/teamup-security, `infra/monitoring/grafana/dashboards/security.json`): 15분 범위, 5초 새로고침.
+
+  | 패널 | 보는 것 |
+  |---|---|
+  | API 수집 상태 | Prometheus가 API를 수집 중인지. "수집 중단"이면 아래 패널이 비어도 공격이 없는 게 아니다 |
+  | 이벤트 종류별 추이 | 1분 동안 생긴 이벤트 수(종류별) |
+  | 로그인 실패 (1분) | `INVALID_CREDENTIALS` 수 |
+  | 403이 많은 경로 Top 5 | 선택한 범위 동안 403이 많은 route |
+  | 레이트리밋 | 429 수(경로별) |
+  | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 (A 파트가 이벤트를 남기면 바로 채워진다) |
+
+  패널은 모두 `increase()`로 증가량만 그린다(uvicorn `--reload`로 카운터가 0이 돼도 그래프가 꺾이지 않게).
+  대시보드는 파일로만 관리한다(화면에서 저장 불가). 고치려면 화면에서 수정 → JSON 내보내기 → 이 파일에 커밋, 데이터소스 uid는 `teamup-prometheus` 유지.
+- 경보 규칙 (`infra/monitoring/prometheus/alerts.yml`, 확인은 http://127.0.0.1:9090/alerts): 1분 안에 로그인 실패 5회 이상 `LoginFailureBurst`, 403 10회 이상 `ForbiddenBurst`. 알림 채널(메일·슬랙)은 없다.
+  로그인은 IP당 1분 5회 제한이라 한 IP에서는 로그인 실패가 1분에 5회까지만 쌓인다(그 뒤는 `rate_limited`).
+- 테스트 `tests/security/test_security_dashboard.py`: 대시보드가 쓰는 `event` 값이 `SecurityEvent` Literal에 있는지, 카운터를 `increase`/`rate`로만 쓰는지, PromQL 괄호 짝 등을 검사한다. **Literal의 이벤트 이름을 바꾸면 이 테스트가 실패하니 대시보드도 같이 고친다.**
+
+**라이브 데모** (`infra/monitoring/demo.sh`, 시드 데이터 필요: `cd backend && uv run python -m scripts.seed_dev`)
+1. 발표 전: API와 모니터링 스택을 띄우고 `bash infra/monitoring/demo.sh prepare`.
+   - Prometheus는 **새로 생긴 시계열의 첫 값은 증가로 세지 않는다**. API를 띄운 뒤 처음 나는 이벤트는 그래프에 안 보이므로, 종류마다 한 번씩 미리 발생시킨다.
+   - 로그인 한도(1분 5회)를 본 실행에 남겨 두려고 시드 계정 토큰을 미리 받아 둔다.
+2. 1분 뒤, 발표 중: 대시보드를 띄워 두고 `bash infra/monitoring/demo.sh`.
+   ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403.
+   10초쯤 뒤 패널이 올라가고 `LoginFailureBurst`·`ForbiddenBurst` 경보가 울린다.
+3. API를 재시작했다면 1부터 다시 한다.
+
+**남은 일**
+- 챗봇 **차단율**: 챗봇 전체 요청 수 카운터가 필요하다. 챗봇 본체를 만들 때 A와 함께 카운터를 추가하면 패널 하나만 더하면 된다.
+- `/metrics`가 인증 없이 열려 있는 점은 C와 같이 정한다(내부망만 허용 / 토큰 / 그대로 두고 위협 모델에 기록). 지금은 `127.0.0.1` 전용 + 외부 배포 금지로 둔다.
 
 ## C. RBAC 정책
 

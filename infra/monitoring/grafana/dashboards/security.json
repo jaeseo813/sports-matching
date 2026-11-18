@@ -239,7 +239,8 @@
         "defaults": {
           "unit": "short",
           "decimals": 0,
-          "min": 0
+          "min": 0,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -252,7 +253,11 @@
           ],
           "values": false
         },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "manual",
+        "maxVizHeight": 40,
+        "minVizHeight": 24
       }
     },
     {
@@ -339,7 +344,8 @@
         "defaults": {
           "unit": "short",
           "decimals": 0,
-          "min": 0
+          "min": 0,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -352,7 +358,11 @@
           ],
           "values": false
         },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "manual",
+        "maxVizHeight": 40,
+        "minVizHeight": 24
       }
     }
   ]

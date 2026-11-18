@@ -1,7 +1,7 @@
 name: backend
 on:
   pull_request:
-    paths: ["backend/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "infra/monitoring/grafana/dashboards/**", ".github/workflows/backend.yml"]
 
 jobs:
   check:
