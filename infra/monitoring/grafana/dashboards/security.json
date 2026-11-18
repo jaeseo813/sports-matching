@@ -1,0 +1,369 @@
+{
+  "uid": "teamup-security",
+  "title": "TeamUp 보안 이벤트",
+  "tags": [
+    "teamup",
+    "security"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API 수집 상태",
+      "type": "stat",
+      "description": "Prometheus가 API의 /metrics를 수집하고 있는지. 수집 중단이면 아래 패널이 비어 보여도 공격이 없는 게 아니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "up{job=\"teamup-api\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "수집 중단",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "수집 중",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "수집 대상 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "이벤트 종류별 추이",
+      "type": "timeseries",
+      "description": "지난 1분 동안 생긴 보안 이벤트 수(종류별).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 18,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "sum by (event) (increase(teamup_security_events_total[1m]))",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "로그인 실패 (1분)",
+      "type": "timeseries",
+      "description": "틀린 비밀번호 로그인 수. 1분에 5회 이상이면 경보(LoginFailureBurst).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "sum(increase(teamup_security_events_total{event=\"unauthorized\",code=\"INVALID_CREDENTIALS\"}[1m]))",
+          "legendFormat": "로그인 실패"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "403이 많은 경로 Top 5",
+      "type": "bargauge",
+      "description": "선택한 시간 범위 동안 권한 없음(403)이 많이 난 경로.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "topk(5, sum by (route) (increase(teamup_security_events_total{event=\"forbidden\"}[$__range])))",
+          "legendFormat": "{{route}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "데이터 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "manual",
+        "maxVizHeight": 40,
+        "minVizHeight": 24
+      }
+    },
+    {
+      "id": 5,
+      "title": "레이트리밋",
+      "type": "timeseries",
+      "description": "요청 한도(429)에 걸린 수(경로별, 지난 1분).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "sum by (route) (increase(teamup_security_events_total{event=\"rate_limited\"}[1m]))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "챗봇 가드 차단 사유별",
+      "type": "bargauge",
+      "description": "선택한 시간 범위 동안 챗봇 입력·출력 가드가 막은 수(사유 코드별).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "sum by (code) (increase(teamup_security_events_total{event=~\"chat_(input|output)_blocked\"}[$__range]))",
+          "legendFormat": "{{code}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "데이터 없음"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "manual",
+        "maxVizHeight": 40,
+        "minVizHeight": 24
+      }
+    }
+  ]
+}

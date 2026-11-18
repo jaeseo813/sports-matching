@@ -1,0 +1,20 @@
+# 보안 경보 규칙. 임계값은 데모용 기본값이다. 바꾸면 docs/security/README.md B 절도 고친다.
+# 확인: http://127.0.0.1:9090/alerts
+groups:
+  - name: teamup-security
+    rules:
+      - alert: LoginFailureBurst
+        expr: sum(increase(teamup_security_events_total{event="unauthorized",code="INVALID_CREDENTIALS"}[1m])) >= 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "1분 안에 로그인 실패 5회 이상 (비밀번호 대입 의심)"
+
+      - alert: ForbiddenBurst
+        expr: sum(increase(teamup_security_events_total{event="forbidden"}[1m])) >= 10
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "1분 안에 403 10회 이상 (남의 매치·자원 접근 시도 의심)"

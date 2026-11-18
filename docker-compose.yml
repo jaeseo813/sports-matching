@@ -27,5 +27,29 @@ services:
     depends_on:
       db: {condition: service_healthy}
 
+  # 보안 대시보드(파트 B). 평소에는 안 뜨고, 필요할 때만:
+  #   docker compose --profile monitoring up -d   → Grafana http://127.0.0.1:3000
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.16.0
+    volumes:
+      - ./infra/monitoring/prometheus:/etc/prometheus:ro
+    extra_hosts: ["host.docker.internal:host-gateway"]  # 호스트의 uvicorn(8000)을 수집
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:13.2.6
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus]
+
 volumes:
   db_data:
+  grafana_data:

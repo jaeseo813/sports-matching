@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: teamup
+    folder: TeamUp
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false   # 화면에서 고친 내용은 JSON으로 내보내 레포에 커밋한다
+    options:
+      path: /var/lib/grafana/dashboards
