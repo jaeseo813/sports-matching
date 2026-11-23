@@ -4,6 +4,8 @@
 from httpx import AsyncClient
 from prometheus_client import REGISTRY
 
+from app.schemas.chat import ChatIn
+from app.services import chatbot
 from app.services.chat_guard import MAX_INPUT_CHARS, check_input, check_output
 from tests.test_chat_api import ask, use_llm
 from tests.test_matches_api import api, login, session, venue_id
@@ -28,3 +30,25 @@ async def test_chat_requests_are_counted(api: AsyncClient) -> None:
     before = _value("teamup_chat_requests_total")
     await api.post("/api/v1/chat", json=ask("안녕"), headers=headers)
     assert _value("teamup_chat_requests_total") == before + 1
+
+
+async def test_history_is_rechecked_every_request() -> None:
+    # 차단율 패널이 "검사 기준"인 이유: 요청마다 이력의 메시지 수만큼 검사한다.
+    from tests.test_chat_api import FakeLLM, text_reply
+
+    data = ChatIn.model_validate(
+        {
+            "messages": [
+                {"role": "user", "content": "안녕"},
+                {"role": "assistant", "content": "안녕하세요"},
+                {"role": "user", "content": "풋살 규칙 알려줘"},
+            ]
+        }
+    )
+    before_in = _value("teamup_chat_guard_checks_total", {"stage": "input"})
+    before_out = _value("teamup_chat_guard_checks_total", {"stage": "output"})
+    ctx = chatbot.ChatContext(None, None, None, None, None, None)  # type: ignore[arg-type]
+    async for _ in chatbot.chat_events(FakeLLM(text_reply("오프사이드는 없어요")), ctx, data):  # type: ignore[arg-type]
+        pass
+    assert _value("teamup_chat_guard_checks_total", {"stage": "input"}) == before_in + 2
+    assert _value("teamup_chat_guard_checks_total", {"stage": "output"}) == before_out + 2

@@ -134,3 +134,13 @@ def test_block_rate_divides_by_guard_checks() -> None:
     assert rates, "챗봇 차단율 패널이 없다"
     for expr in rates:
         assert "teamup_chat_guard_checks_total" in expr.split("/", 1)[1], expr
+
+
+def test_block_rate_excludes_outage_and_handles_zero() -> None:
+    # 가드 장애(GUARD_UNAVAILABLE)는 공격이 아니다. 차단이 아직 없으면 0%, 검사가 없으면 비운다(NaN 금지).
+    rates = [e for e in _exprs() if "chat_" in e and "/" in e]
+    for expr in rates:
+        if "PII_" in expr and 'code=~"PII_' not in expr:
+            assert "GUARD_UNAVAILABLE" in expr, expr
+        assert "or vector(0)" in expr, expr
+        assert ") > 0" in expr, expr

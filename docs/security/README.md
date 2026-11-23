@@ -79,7 +79,7 @@ docker compose --profile monitoring up -d
   | 403이 많은 경로 Top 5 | 선택한 범위 동안 403이 많은 route |
   | 레이트리밋 | 429 수(경로별) |
   | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 |
-  | 챗봇 가드 차단율 | 가드 **검사** 대비 차단 비율(입력·출력), 개인정보 마스킹(`PII_*`) 비율은 따로. 가드가 요청마다 대화 이력 전체를 다시 검사하므로 요청 수가 아니라 검사 수로 나눈다 |
+  | 챗봇 가드 차단율 | 가드 **검사 기준** 차단 비율(입력·출력). 개인정보 마스킹(`PII_*`)은 따로, 가드 장애(`GUARD_UNAVAILABLE`)는 뺀다. 가드가 요청마다 대화 이력 전체를 다시 검사하므로 분자·분모 모두 이력 재검사를 포함한다 — 공격 메시지 수 기준이 아니다(아래 "알려진 한계") |
   | 챗봇 요청 수 | 로그인·레이트리밋을 통과한 챗봇 요청 수 |
 
   패널은 모두 `increase()`로 증가량만 그린다(uvicorn `--reload`로 카운터가 0이 돼도 그래프가 꺾이지 않게).
@@ -99,13 +99,18 @@ docker compose --profile monitoring up -d
 
 **/metrics 보호 (토큰)**
 - 방식: `.env`의 `METRICS_TOKEN`. API는 `Authorization: Bearer <값>`이 맞을 때만 지표를 준다(비교는 `secrets.compare_digest`). 틀리면 401 `METRICS_UNAUTHORIZED`이고 보안 이벤트(`unauthorized`, route `/metrics`)로도 남는다.
-- 비워 두면 `ENV=local`에서만 열리고, `staging`·`production`에서는 항상 401이다(토큰 없이 실수로 열리지 않게).
-- Prometheus는 같은 `.env` 값을 compose가 넘겨 받아 시작할 때 `/prometheus/metrics_token` 파일로 쓰고 그 값으로 수집한다. 토큰은 레포·이미지에 남지 않는다.
+- 비워 두면 `ENV=local`에서만 열리고, `ENV`를 `staging`·`production`으로 둔 서버에서는 항상 401이다. `ENV`의 기본값이 `local`이니 스테이징 서버는 `ENV`를 꼭 지정한다.
+- 값은 `openssl rand -hex 32`로 만든다(영문·숫자 64자). `/metrics`에는 레이트리밋이 없어 긴 무작위 값이 유일한 방어이고, `$`·공백이 들어가면 compose와 API가 다르게 읽어 수집이 끊긴다.
+- Prometheus는 같은 `.env` 값을 compose가 넘겨 받아 시작할 때 `/prometheus/metrics_token` 파일로 쓰고 그 값으로 수집한다. 토큰은 레포·이미지에는 남지 않지만, 컨테이너 환경변수라 `docker inspect`로는 보인다(로컬 개발용 수준).
 - 토큰을 넣거나 바꾸면 **API와 Prometheus를 둘 다 다시 띄운다**(`docker compose --profile monitoring up -d --force-recreate prometheus`). 한쪽만 바꾸면 수집 상태가 "수집 중단"이 되고, 5초마다 401 이벤트가 쌓인다.
 - 고른 이유: 내 컴퓨터 요청만 허용하는 방식은 Docker를 거친 요청이 운영체제마다 다른 주소로 보여 깨지기 쉽다. 토큰은 Mac·Windows·Linux에서 같게 동작하고, "토큰 없이 요청하면 막힌다"를 데모로 보일 수 있다.
 
-**남은 일**
-- 없음. 새 보안 이벤트 종류가 생기면 Literal과 대시보드를 같은 PR에서 고친다.
+**알려진 한계 (A와 같이 볼 것)**
+- 챗봇은 요청마다 대화 이력 전체를 가드에 다시 넣는다(`chatbot.chat_events`). 그래서 긴 대화일수록 같은 메시지가 여러 번 검사·기록되고, 차단율은 공격 메시지 수가 아니라 검사 기준이 된다.
+- 화면(`ChatPanel`)은 막힌 사용자 질문을 이력에 남겨 다음 요청마다 다시 보내서, 한 번 막힌 대화는 계속 막히고 차단 이벤트도 매번 다시 쌓인다.
+- 해결 방향: 이력은 기록 없이 검사하고 마지막 사용자 메시지와 새 답만 기록·집계, 화면은 막힌 질문을 이력에서 뺀다. 가드·챗봇 담당(A)이 정할 일이다.
+
+새 보안 이벤트 종류가 생기면 Literal과 대시보드를 같은 PR에서 고친다.
 
 ## C. RBAC 정책
 
