@@ -45,3 +45,4 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["classifier: 입력 가드 LLM 분류기를 끄지 않는다(가짜 클라이언트로 직접 흉내 낸다)"]
