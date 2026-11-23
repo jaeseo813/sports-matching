@@ -74,6 +74,7 @@ class FakeLLM:
 def use_llm(fake: FakeLLM | None) -> None:
     app.dependency_overrides[get_llm] = lambda: fake
     chat_limiter.reset()
+    chatbot.token_usage.clear()
 
 
 def ask(text: str, sport: str | None = "badminton") -> dict[str, object]:
@@ -97,10 +98,10 @@ async def test_plain_answer_streams_message_then_done(api: AsyncClient) -> None:
     res = await api.post("/api/v1/chat", json=ask("안녕"), headers=await login(api, 1))
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/event-stream")
-    assert events(res.text) == [
-        {"type": "message", "text": "안녕하세요! 무엇을 도와드릴까요?"},
-        {"type": "done"},
-    ]
+    got = events(res.text)
+    assert [e["type"] for e in got] == ["message", "done"]
+    assert got[0]["text"] == got[0]["history"] == "안녕하세요! 무엇을 도와드릴까요?"
+    assert len(got[0]["sig"]) == 64  # 다음 요청에 이력으로 돌려보낼 때 쓰는 서명
     sent = fake.calls[0]["messages"]
     assert sent[0] == {"role": "system", "content": chatbot.SYSTEM_PROMPT}  # 캐시용 고정 접두사
     assert "배드민턴" in sent[1]["content"] and "1단계" in sent[1]["content"]  # 종목 맥락
@@ -139,6 +140,9 @@ async def test_suggest_action_emits_server_built_button(api: AsyncClient) -> Non
     use_llm(fake)
     res = await api.post("/api/v1/chat", json=ask("7번 매치 보여줘"), headers=await login(api, 1))
     assert {"type": "action", "label": "매치 보러 가기", "href": "/matches/7"} in events(res.text)
+    # 띄운 버튼은 이력에 적어 둔다 (후속 질문에서 매치 번호를 알 수 있게, 서명에 포함)
+    msg = next(e for e in events(res.text) if e["type"] == "message")
+    assert msg["history"] == "버튼을 눌러 보세요.\n[버튼: 매치 보러 가기 /matches/7]"
 
 
 async def test_llm_failure_degrades_to_filter_message(api: AsyncClient) -> None:

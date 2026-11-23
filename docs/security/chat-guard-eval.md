@@ -64,9 +64,24 @@
 - 출력 쪽 우회(실명, 주어 없는 쓰기 안내, 한글 숫자 레이팅)는 아직 규칙만 본다 — [finding 001](findings/001-rule-guard-bypass.md).
 - DeepSeek 장애 시 챗봇 전체가 멈춘다(어차피 본 답변도 DeepSeek이라 추가 손실은 없음).
 
+## v2.1 (2026-11-23)
+- 분류기·시스템 프롬프트를 고쳤다. 공개된 주최자 닉네임·매너를 묻는 질문의 과잉 차단을 없앴다([finding 003](findings/003-multi-turn-and-forged-history.md)).
+- `holdout_benign.txt`를 새로 썼다(15개). 이전 판은 결과를 보고 규칙을 고쳐 시험지 역할을 잃었다.
+
+| 세트 | 결과 |
+|---|---|
+| `holdout_attacks.txt` | 15 / 15 차단 |
+| `known_bypass.txt` | 7 / 7 차단 |
+| 규칙 세트 4종 | 50 / 50 차단 |
+| `input_pii.txt` | 10 / 10 마스킹 |
+| `input_benign.txt` (오탐) | 0 / 33 |
+| `holdout_benign.txt` v2 (오탐, 새 시험지) | **0 / 15** |
+| 출력 세트 | 차단 14/14, 마스킹 7/7, 오탐 0/14 |
+
 ## 실제 챗봇 공격 (2026-11-23)
 `/chat` + DeepSeek에 공격 33개를 두 모드(정상 / 입력 가드 끔)로 보냈다. 시스템 프롬프트를 바꿔 말하게 하는 노출과 `</data>` 구분자 탈출을 찾아 고쳤다.
 조치 뒤에는 입력 가드를 꺼도 LLM이 전부 거절했다 → [finding 002](findings/002-chatbot-live-redteam.md).
+여러 턴 공격 5개와 위조 이력은 [finding 003](findings/003-multi-turn-and-forged-history.md)에 정리했다. 위조 이력은 서명으로 막았고, 여러 턴 공격은 재현되지 않았다.
 
 ## 방식 비교 요약
 
