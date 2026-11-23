@@ -53,6 +53,14 @@ forbidden() {
   status -X POST "$API/matches/$2/cancel" -H "authorization: Bearer $1"
 }
 
+# 챗봇에 너무 긴 입력(600자). 입력 가드가 규칙만으로 막아서 DeepSeek를 부르지 않는다(비용 없음).
+# 서버에 DEEPSEEK_API_KEY가 없으면 가드 전에 503으로 끝난다.
+too_long_chat() {
+  long=$(printf '가%.0s' $(seq 600))
+  status -X POST "$API/chat" -H "authorization: Bearer $1" -H 'content-type: application/json' \
+    -d "{\"messages\":[{\"role\":\"user\",\"content\":\"$long\"}]}"
+}
+
 prepare() {
   echo "▶ 예열: 시드 계정으로 로그인해 토큰을 받아 둔다"
   token=$({ curl -s -X POST "$API/auth/login" -H 'content-type: application/json' \
@@ -70,6 +78,8 @@ prepare() {
   echo "▶ 예열: 이벤트 종류마다 한 번씩"
   echo "  401 토큰 없음      $(status "$API/auth/me")"
   echo "  403 남의 매치 취소 $(forbidden "$token" "$match")"
+  chat=$(too_long_chat "$token")
+  echo "  챗봇 너무 긴 입력  $chat$([ "$chat" = 503 ] && echo ' (챗봇 키 없음: 챗봇 단계는 건너뜀)')"
   printf "  401 로그인 실패 → 429 한도 초과:"
   for _ in 1 2 3 4 5; do printf " %s" "$(bad_login)"; done
   echo
@@ -93,6 +103,9 @@ run() {
   echo
   echo "③ 남이 연 매치 취소 12회 (forbidden, 주최자 전용)"
   for _ in $(seq 12); do printf " %s" "$(forbidden "$token" "$match")"; done
+  echo
+  echo "④ 챗봇에 너무 긴 입력 3회 (chat_input_blocked TOO_LONG, 200 응답 안에 차단 메시지)"
+  for _ in 1 2 3; do printf " %s" "$(too_long_chat "$token")"; done
   echo
   echo "대시보드: $GRAFANA/d/teamup-security  경보: http://127.0.0.1:9090/alerts"
 }

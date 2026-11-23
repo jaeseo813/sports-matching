@@ -33,3 +33,14 @@ SECURITY_EVENTS = Counter(
 def record_security_event(event: SecurityEvent, code: str, route: str = "") -> None:
     SECURITY_EVENTS.labels(event=event, code=code, route=route).inc()
     _log.warning("security_event event=%s code=%s route=%s", event, code, route)
+
+
+# 챗봇 차단율의 분모. 가드는 요청마다 대화 이력 전체를 다시 검사하므로, 차단율은 요청 수가 아니라 검사 수로 나눈다.
+CHAT_REQUESTS = Counter("teamup_chat_requests_total", "챗봇 요청 수 (인증·레이트리밋 통과 후)")
+CHAT_GUARD_CHECKS = Counter("teamup_chat_guard_checks_total", "챗봇 가드 검사 수", ["stage"])
+
+GuardStage = Literal["input", "output"]
+
+
+def count_guard_check(stage: GuardStage) -> None:
+    CHAT_GUARD_CHECKS.labels(stage=stage).inc()
