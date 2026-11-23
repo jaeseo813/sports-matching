@@ -53,6 +53,7 @@ export interface SportOut {
   players_per_team: number[];
   positions: string[];
   tier_labels: Record<string, string>; // "1"~"5"
+  faq: string[]; // 규칙 FAQ 질문 (답은 챗봇이 한다)
 }
 
 export interface VenueOut {

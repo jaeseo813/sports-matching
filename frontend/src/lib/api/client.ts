@@ -82,3 +82,23 @@ export async function api<T>(path: string, init: RequestInit = {}, options: { au
 
 export const post = <T>(path: string, body: unknown, options?: { auth?: boolean }) =>
   api<T>(path, { method: "POST", body: JSON.stringify(body) }, options);
+
+// SSE를 POST로 받는다(EventSource는 POST·인증 헤더를 못 쓴다). 서버는 `data: {json}` 줄을 빈 줄로 나눠 보낸다
+export async function postStream<E>(path: string, body: unknown, onEvent: (event: E) => void): Promise<void> {
+  const res = await send(path, { method: "POST", body: JSON.stringify(body) }, true);
+  if (res.status === 401) setToken(null);
+  if (!res.ok || !res.body) throw await toError(res);
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+      if (line) onEvent(JSON.parse(line.slice(6)) as E);
+    }
+  }
+}
