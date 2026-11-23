@@ -65,3 +65,18 @@ def _test_database() -> None:
 async def client() -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _no_live_guard_classifier(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """입력 가드의 LLM 분류는 실제 DeepSeek을 부른다. 테스트에서는 꺼 두고(규칙만), 분류기 테스트가 직접 흉내 낸다."""
+    if "classifier" in request.keywords:
+        return
+    from app.services import chat_guard
+
+    async def rules_only(text: str) -> str | None:
+        return None
+
+    monkeypatch.setattr(chat_guard, "classify_input", rules_only)

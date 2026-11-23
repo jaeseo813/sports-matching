@@ -26,18 +26,24 @@
 
 **목표**: 챗봇 입력·출력에 가드를 세우고, 공격 문장 세트로 우회 시도 → 보강 → 재검증한다 (AGENTS.md 5절).
 
-**지금 있는 것**
-- `services/chat_guard.py`: `check_input(text)`, `check_output(text)` → `GuardResult(allowed, text, code)`. 입력 길이 상한(500자)만 구현.
+**지금 있는 것** (v2 결합: 입력은 규칙 → LLM 분류, 출력은 규칙)
+- `services/chat_guard.py`: `check_input(text)`, `check_output(text)` → `GuardResult(allowed, text, code)`.
   두 함수는 `async`다(LLM 판정이 들어올 수 있게). **함수 모양은 유지하고 안쪽만 바꾼다** — 챗봇 쪽이 이 두 함수만 부른다.
-- 챗봇 본체(`services/chatbot.py`, `POST /api/v1/chat`)는 **아직 없다**(W12). 가드는 문자열만 받으므로 챗봇 없이 먼저 만들고 테스트할 수 있다.
+  - 입력 차단: `TOO_LONG`, `PROMPT_EXTRACTION`, `PROMPT_INJECTION`, `OTHERS_INFO`, `OUT_OF_SCOPE` / 마스킹 후 통과: `PII_INPUT`
+  - 출력 차단: `PROMPT_LEAK`, `HTML`, `LINK`, `RATING_LEAK`, `WRITE_CLAIM` / 마스킹 후 통과: `PII_OUTPUT`
+  - 입력은 규칙을 통과하면 DeepSeek으로 한 번 더 분류한다(마스킹한 값만). 키가 없으면 규칙만, 분류 실패는 차단(`GUARD_UNAVAILABLE` → 챗봇은 필터 UI로 degrade).
+  - 차단·마스킹 모두 `record_security_event("chat_input_blocked" | "chat_output_blocked", code)` → 대시보드 "챗봇 가드 차단 사유별" 패널.
+- 챗봇(`services/chatbot.py`)은 대화 이력까지 메시지마다 가드에 넣는다(user → 입력, assistant → 출력 가드).
+- 공격 세트 `backend/tests/security/chat_attacks/`(규칙 세트, LLM이 맡는 `known_bypass`, 시험지 `holdout_*` — 쓰는 법은 그 폴더 README), 회귀 테스트 `tests/security/test_chat_guard.py`(pytest에서는 LLM 분류기를 끈다).
+- 실제 평가: `cd backend && uv run python -m tests.security.test_chat_guard` (DeepSeek 호출, 1분쯤).
+- 실제 챗봇 공격: `uv run python -m tests.security.redteam_chat 결과.json` (시드 데이터 필요, 3분쯤). 입력 가드를 끈 모드도 함께 돌려 다층 방어를 본다. 결과 [findings/002](findings/002-chatbot-live-redteam.md).
+- 평가 표 [chat-guard-eval.md](chat-guard-eval.md), 우회 기록 [findings/001](findings/001-rule-guard-bypass.md).
 
-**할 일**
-1. 공격 문장 세트 만들기: `backend/tests/security/chat_attacks/`에 종류별 파일(인젝션·탈옥, 시스템 프롬프트 추출, 타인 정보 요청, 범위 밖, 개인정보 입력)과 **정상 질문 세트**(오탐 측정용).
-2. 입력 가드: 인젝션·탈옥, 타인 정보 요청, 범위 밖 요청, 입력 속 개인정보.
-3. 출력 가드: 개인정보(이메일·전화·좌표·주소·실명), 시스템 프롬프트 노출, 허용 안 된 HTML·링크, 쓰기 동작 안내.
-4. 판정 방식 비교(규칙·마스킹 / LLM 분류 / 결합): 같은 세트로 **차단율·오탐률·추가 지연** 표를 만든다. LLM 판정을 쓰면 외부 LLM에 개인정보를 보내지 않도록 규칙 마스킹을 먼저 거친다(AGENTS.md 8절).
-5. 차단·마스킹할 때 `record_security_event("chat_input_blocked" | "chat_output_blocked", code)`.
-6. `docs/security/threat-model.md`의 챗봇 위협 표 채우기, 우회 성공 사례는 `findings/NNN-*.md`.
+**남은 할 일 (W13~14)**
+1. Red 계속: 여러 턴에 나눠 빼내기, 공격 세트 키우기, 다른 종목·사용자. 1차 결과는 [findings/002](findings/002-chatbot-live-redteam.md).
+2. `holdout_benign.txt`를 새로 쓴다(v2를 만들면서 결과를 보고 고쳐 시험지 역할을 잃음).
+3. 위조한 assistant 이력 문제: 대화 이력을 서버에 저장(6절 30일 보관)하면 해결.
+4. 챗봇 전체 요청 수 카운터(대시보드 차단율용, B와 함께).
 
 ## B. 보안 대시보드 (Grafana)
 
