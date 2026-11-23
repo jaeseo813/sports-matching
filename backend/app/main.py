@@ -1,6 +1,8 @@
 import logging
+import secrets
+from typing import Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -8,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.security_events import SecurityEvent, record_security_event
 from app.core.security_headers import SecurityHeadersMiddleware
 
@@ -23,6 +25,25 @@ _SECURITY_STATUS: dict[int, SecurityEvent] = {
     403: "forbidden",
     429: "rate_limited",
 }
+
+
+def _require_metrics_token(
+    request: Request, settings: Annotated[Settings, Depends(get_settings)]
+) -> None:
+    """METRICS_TOKEN이 있으면 Bearer 토큰이 맞아야 한다. 비어 있으면 local에서만 연다(스테이징·운영은 닫음)."""
+    if not settings.metrics_token:
+        if settings.env == "local":
+            return
+    else:
+        scheme, _, given = request.headers.get("authorization", "").partition(" ")
+        if scheme.lower() == "bearer" and secrets.compare_digest(
+            given.encode(), settings.metrics_token.encode()
+        ):
+            return
+    raise HTTPException(
+        status_code=401,
+        detail={"code": "METRICS_UNAUTHORIZED", "message": "지표를 볼 권한이 없습니다"},
+    )
 
 
 def create_app() -> FastAPI:
@@ -44,8 +65,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(api_router)
 
-    # Prometheus 수집용. 로컬·스테이징 전용이라 인증을 두지 않는다 (외부 공개 배포 금지)
-    @app.get("/metrics", include_in_schema=False)
+    # Prometheus 수집용. 거부하면 401이고, 보안 이벤트(route="/metrics")로도 남는다
+    @app.get("/metrics", include_in_schema=False, dependencies=[Depends(_require_metrics_token)])
     async def metrics() -> Response:
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 

@@ -19,7 +19,7 @@
   - `code`는 사유 코드(`INVALID_CREDENTIALS`, `FORBIDDEN`, `PROMPT_INJECTION` 등), `route`는 `/matches/{match_id}` 같은 템플릿(`/api/v1` 제외).
   - **원문 입력·토큰·이메일·좌표는 넘기지 않는다.** 라벨 값 종류가 무한히 늘어나도 안 된다(사용자 id, 매치 id 금지).
 - 401·403·429는 `app/main.py`의 예외 처리기가 **자동으로** 남긴다. 서비스 코드에서 따로 부를 필요 없다.
-- 수집: `GET /metrics` (Prometheus 형식, 인증 없음 — 로컬·스테이징 전용).
+- 수집: `GET /metrics` (Prometheus 형식). `.env`의 `METRICS_TOKEN`이 있으면 `Authorization: Bearer <값>`이 맞아야 하고, 비어 있으면 `ENV=local`에서만 열린다(B 절 "/metrics 보호").
 - 테스트: `tests/security/test_security_events.py`
 
 ## A. 챗봇 가드레일
@@ -43,7 +43,7 @@
 1. Red 계속: 여러 턴에 나눠 빼내기, 공격 세트 키우기, 다른 종목·사용자. 1차 결과는 [findings/002](findings/002-chatbot-live-redteam.md).
 2. `holdout_benign.txt`를 새로 쓴다(v2를 만들면서 결과를 보고 고쳐 시험지 역할을 잃음).
 3. 위조한 assistant 이력 문제: 대화 이력을 서버에 저장(6절 30일 보관)하면 해결.
-4. 챗봇 전체 요청 수 카운터(대시보드 차단율용, B와 함께).
+4. ~~챗봇 전체 요청 수 카운터~~ → B에서 추가함(`teamup_chat_requests_total`, 가드 검사 수 `teamup_chat_guard_checks_total`). `check_input`·`check_output` 첫 줄의 `count_guard_check`는 지우지 않는다(차단율의 분모).
 
 ## B. 보안 대시보드 (Grafana)
 
@@ -78,7 +78,9 @@ docker compose --profile monitoring up -d
   | 로그인 실패 (1분) | `INVALID_CREDENTIALS` 수 |
   | 403이 많은 경로 Top 5 | 선택한 범위 동안 403이 많은 route |
   | 레이트리밋 | 429 수(경로별) |
-  | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 (A 파트가 이벤트를 남기면 바로 채워진다) |
+  | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 |
+  | 챗봇 가드 차단율 | 가드 **검사** 대비 차단 비율(입력·출력), 개인정보 마스킹(`PII_*`) 비율은 따로. 가드가 요청마다 대화 이력 전체를 다시 검사하므로 요청 수가 아니라 검사 수로 나눈다 |
+  | 챗봇 요청 수 | 로그인·레이트리밋을 통과한 챗봇 요청 수 |
 
   패널은 모두 `increase()`로 증가량만 그린다(uvicorn `--reload`로 카운터가 0이 돼도 그래프가 꺾이지 않게).
   대시보드는 파일로만 관리한다(화면에서 저장 불가). 고치려면 화면에서 수정 → JSON 내보내기 → 이 파일에 커밋, 데이터소스 uid는 `teamup-prometheus` 유지.
@@ -91,13 +93,19 @@ docker compose --profile monitoring up -d
    - Prometheus는 **새로 생긴 시계열의 첫 값은 증가로 세지 않는다**. API를 띄운 뒤 처음 나는 이벤트는 그래프에 안 보이므로, 종류마다 한 번씩 미리 발생시킨다.
    - 로그인 한도(1분 5회)를 본 실행에 남겨 두려고 시드 계정 토큰을 미리 받아 둔다.
 2. 1분 뒤, 발표 중: 대시보드를 띄워 두고 `bash infra/monitoring/demo.sh`.
-   ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403.
+   ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403 ④ 챗봇에 600자 입력 3회 → 입력 가드 `TOO_LONG` 차단(규칙만으로 막혀 DeepSeek를 부르지 않는다. 서버에 `DEEPSEEK_API_KEY`가 없으면 503으로 끝나고 차단율은 비어 있다).
    10초쯤 뒤 패널이 올라가고 `LoginFailureBurst`·`ForbiddenBurst` 경보가 울린다.
 3. API를 재시작했다면 1부터 다시 한다.
 
+**/metrics 보호 (토큰)**
+- 방식: `.env`의 `METRICS_TOKEN`. API는 `Authorization: Bearer <값>`이 맞을 때만 지표를 준다(비교는 `secrets.compare_digest`). 틀리면 401 `METRICS_UNAUTHORIZED`이고 보안 이벤트(`unauthorized`, route `/metrics`)로도 남는다.
+- 비워 두면 `ENV=local`에서만 열리고, `staging`·`production`에서는 항상 401이다(토큰 없이 실수로 열리지 않게).
+- Prometheus는 같은 `.env` 값을 compose가 넘겨 받아 시작할 때 `/prometheus/metrics_token` 파일로 쓰고 그 값으로 수집한다. 토큰은 레포·이미지에 남지 않는다.
+- 토큰을 넣거나 바꾸면 **API와 Prometheus를 둘 다 다시 띄운다**(`docker compose --profile monitoring up -d --force-recreate prometheus`). 한쪽만 바꾸면 수집 상태가 "수집 중단"이 되고, 5초마다 401 이벤트가 쌓인다.
+- 고른 이유: 내 컴퓨터 요청만 허용하는 방식은 Docker를 거친 요청이 운영체제마다 다른 주소로 보여 깨지기 쉽다. 토큰은 Mac·Windows·Linux에서 같게 동작하고, "토큰 없이 요청하면 막힌다"를 데모로 보일 수 있다.
+
 **남은 일**
-- 챗봇 **차단율**: 챗봇 전체 요청 수 카운터가 필요하다. 챗봇 본체를 만들 때 A와 함께 카운터를 추가하면 패널 하나만 더하면 된다.
-- `/metrics`가 인증 없이 열려 있는 점은 C와 같이 정한다(내부망만 허용 / 토큰 / 그대로 두고 위협 모델에 기록). 지금은 `127.0.0.1` 전용 + 외부 배포 금지로 둔다.
+- 없음. 새 보안 이벤트 종류가 생기면 Literal과 대시보드를 같은 PR에서 고친다.
 
 ## C. RBAC 정책
 
