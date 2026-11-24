@@ -10,6 +10,9 @@ class ChatMessageIn(BaseModel):
 
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=2000)
+    sig: str | None = Field(
+        default=None, max_length=64
+    )  # assistant 메시지: 서버가 답과 함께 준 서명
 
 
 class ChatIn(BaseModel):

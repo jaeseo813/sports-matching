@@ -11,7 +11,7 @@ import { useSportRules } from "../lib/sports";
 type ChatEvent =
   | { type: "status"; text: string }
   | { type: "action"; label: string; href: string }
-  | { type: "message"; text: string }
+  | { type: "message"; text: string; history: string; sig: string }
   | { type: "error"; code: string; message: string }
   | { type: "done" };
 
@@ -20,6 +20,9 @@ interface Turn {
   text: string;
   actions?: { label: string; href: string }[];
   error?: boolean; // 오류 안내는 대화 이력으로 서버에 보내지 않는다
+  // 서버가 준 이력용 문자열(띄운 버튼 포함)과 서명. 다음 질문 때 손대지 않고 그대로 돌려보낸다(위조 방지)
+  history?: string;
+  sig?: string;
 }
 
 const MAX_INPUT = 500; // 백엔드 chat_guard.MAX_INPUT_CHARS와 같게
@@ -71,10 +74,9 @@ function Conversation({ sport, suggestions, autoFocus }: { sport: string | null;
   const ask = async (text: string) => {
     const question = text.trim();
     if (!question || busy) return;
-    // 띄운 버튼도 이력에 적어 둔다: "그 매치 몇 명 남았어?" 같은 후속 질문에서 챗봇이 매치 번호를 알 수 있게
     const history = turns
-      .filter((t) => !t.error)
-      .map(({ role, text: content, actions }) => ({ role, content: content + (actions ?? []).map((a) => `\n[버튼: ${a.label} ${a.href}]`).join("") }));
+      .filter((t) => !t.error && (t.role === "user" || t.sig))
+      .map((t) => (t.role === "user" ? { role: t.role, content: t.text } : { role: t.role, content: t.history ?? t.text, sig: t.sig }));
     const messages = [...history, { role: "user" as const, content: question }].slice(-MAX_HISTORY);
     setTurns((prev) => [...prev, { role: "user", text: question }]);
     setInput("");
@@ -86,7 +88,7 @@ function Conversation({ sport, suggestions, autoFocus }: { sport: string | null;
       await postStream<ChatEvent>("/chat", { sport, messages }, (e) => {
         if (e.type === "status") setStatus(e.text);
         else if (e.type === "action" && safeHref(e.href)) reply.actions = [...(reply.actions ?? []), { label: e.label, href: e.href }];
-        else if (e.type === "message") reply.text = e.text;
+        else if (e.type === "message") Object.assign(reply, { text: e.text, history: e.history, sig: e.sig });
         else if (e.type === "error") {
           reply.text = e.message;
           reply.error = true;

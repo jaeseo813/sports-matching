@@ -33,22 +33,31 @@ async def test_chat_requests_are_counted(api: AsyncClient) -> None:
 
 
 async def test_history_is_rechecked_every_request() -> None:
-    # 차단율 패널이 "검사 기준"인 이유: 요청마다 이력의 메시지 수만큼 검사한다.
+    # 차단율 패널이 "검사 기준"인 이유: 입력 가드는 요청마다 이력의 사용자 메시지를 전부 다시 검사한다.
+    # 출력 가드는 새 답 하나만 검사한다(assistant 이력은 서명으로 검증, #35).
+    from types import SimpleNamespace
+
     from tests.test_chat_api import FakeLLM, text_reply
 
     data = ChatIn.model_validate(
         {
             "messages": [
                 {"role": "user", "content": "안녕"},
-                {"role": "assistant", "content": "안녕하세요"},
+                {
+                    "role": "assistant",
+                    "content": "안녕하세요",
+                    "sig": chatbot.sign_history(1, "안녕하세요"),
+                },
                 {"role": "user", "content": "풋살 규칙 알려줘"},
             ]
         }
     )
     before_in = _value("teamup_chat_guard_checks_total", {"stage": "input"})
     before_out = _value("teamup_chat_guard_checks_total", {"stage": "output"})
-    ctx = chatbot.ChatContext(None, None, None, None, None, None)  # type: ignore[arg-type]
-    async for _ in chatbot.chat_events(FakeLLM(text_reply("오프사이드는 없어요")), ctx, data):  # type: ignore[arg-type]
+    user = SimpleNamespace(id=1)
+    ctx = chatbot.ChatContext(user, None, None, None, None, None)  # type: ignore[arg-type]
+    llm = FakeLLM(text_reply("오프사이드는 없어요"))
+    async for _ in chatbot.chat_events(llm, ctx, data):  # type: ignore[arg-type]
         pass
     assert _value("teamup_chat_guard_checks_total", {"stage": "input"}) == before_in + 2
-    assert _value("teamup_chat_guard_checks_total", {"stage": "output"}) == before_out + 2
+    assert _value("teamup_chat_guard_checks_total", {"stage": "output"}) == before_out + 1
