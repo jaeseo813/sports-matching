@@ -7,7 +7,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "refresh": "5s",
   "time": {
@@ -324,8 +324,8 @@
       "gridPos": {
         "x": 0,
         "y": 17,
-        "w": 24,
-        "h": 7
+        "w": 12,
+        "h": 8
       },
       "targets": [
         {
@@ -363,6 +363,146 @@
         "sizing": "manual",
         "maxVizHeight": 40,
         "minVizHeight": 24
+      }
+    },
+    {
+      "id": 7,
+      "title": "챗봇 가드 차단율",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 8,
+        "h": 8
+      },
+      "description": "선택한 시간 범위의 가드 검사 대비 차단 비율(검사 기준). 입력 가드는 요청마다 이력의 사용자 메시지를 전부 다시 검사하므로 입력 차단율은 이력 재검사를 포함한다 — 공격 메시지 수 기준이 아니다. 출력 가드는 새 답만 검사한다. 개인정보 마스킹(PII_*)은 통과라서 따로, 가드 장애(GUARD_UNAVAILABLE)는 공격이 아니라서, 이력 위조(FORGED_HISTORY)는 입력 가드 검사 전에 막혀 분모에 없어서 뺀다(위조는 '차단 사유별' 패널에 보인다). 차단이 없으면 0%, 검사가 없으면 '데이터 없음'.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_input_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"input\"}[$__range])) > 0)",
+          "legendFormat": "입력 차단",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_output_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"output\"}[$__range])) > 0)",
+          "legendFormat": "출력 차단",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "(sum(increase(teamup_security_events_total{event=~\"chat_(input|output)_blocked\",code=~\"PII_.*\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total[$__range])) > 0)",
+          "legendFormat": "개인정보 마스킹",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1,
+          "noValue": "데이터 없음",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "vertical",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "챗봇 요청 수",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "teamup-prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 17,
+        "w": 4,
+        "h": 8
+      },
+      "description": "선택한 시간 범위 동안 챗봇 요청 수(로그인·레이트리밋 통과 후).",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "teamup-prometheus"
+          },
+          "expr": "sum(increase(teamup_chat_requests_total[$__range]))",
+          "legendFormat": "요청",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "데이터 없음",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
       }
     }
   ]

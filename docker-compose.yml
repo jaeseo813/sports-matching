@@ -32,6 +32,14 @@ services:
   prometheus:
     profiles: ["monitoring"]
     image: prom/prometheus:v3.16.0
+    # /metrics 토큰을 .env에서 받아 파일로 쓴 뒤 시작한다(토큰은 레포·이미지에 남지 않는다)
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        printf '%s' "$$METRICS_TOKEN" > /prometheus/metrics_token &&
+        exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
     volumes:
       - ./infra/monitoring/prometheus:/etc/prometheus:ro
     extra_hosts: ["host.docker.internal:host-gateway"]  # 호스트의 uvicorn(8000)을 수집
