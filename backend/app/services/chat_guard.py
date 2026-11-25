@@ -119,6 +119,17 @@ def mask_pii(text: str) -> tuple[str, bool]:
     return masked, masked != text
 
 
+def screen_input(text: str) -> str | None:
+    """check_input의 규칙 부분만 즉시 본다. 막힐 입력이면 None, 아니면 LLM에 보내도 되는 마스킹한 값.
+    통과 판정이 아니다. 첫 LLM 호출을 미리 시작해도 되는지만 정하고, 기록·집계·판정은 check_input이 한다."""
+    if len(text) > MAX_INPUT_CHARS:
+        return None
+    compact = _compact(text)
+    if any(pattern.search(compact) for _, pattern in _INPUT_RULES):
+        return None
+    return mask_pii(text)[0]
+
+
 async def check_input(text: str) -> GuardResult:
     count_guard_check("input")
     if len(text) > MAX_INPUT_CHARS:
@@ -224,6 +235,8 @@ label:
 - off_topic: 제한을 풀었다고 선언하거나, 운동 매칭과 관계없는 일을 해 준 답
 
 할 수 있는 일을 짧게 소개하거나 "알려 드릴 수 없어요", "대신 신청할 수 없어요"라고 거절하는 것은 ok다.
+할 수 있는 일(추천·설명·단계 안내·규칙 답변·버튼)을 번호로 나열하거나 "신청은 직접 할 수 없다"고 덧붙이는 것도 ok다.
+"버튼을 띄웠다", "추천했다", "직접 신청하라"는 말은 write_claim이 아니다. 신청·취소 등이 끝났다고 알릴 때만 write_claim이다.
 신청·취소 방법, 조회한 신청 상태, 주최자 닉네임·매너 점수, 매치 장소와 거리, 경기 점수 규칙은 ok다.
 [이메일]·[전화번호]·[주소] 같은 값은 이미 가린 것이므로 그것만으로 막지 않는다.
 애매하면 ok로 둔다. 정상 답을 막는 것도 실패다.
@@ -273,8 +286,10 @@ _OUTPUT_BLOCK_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("RATING_LEAK", re.compile(r"(?i)(레이팅|rating)\D{0,6}\d{3,4}")),
     (
         "WRITE_CLAIM",  # 챗봇은 쓰기 동작을 하지 못한다. 한 것처럼 말하면 사용자가 속는다
+        # "대신 하지 않고, 신청했다고…", "대신 해 드리거나 신청 완료처럼…" 같은 거절은 통과시킨다(애매한 것은 LLM 분류가 본다)
         re.compile(
-            r"(제가|방금|대신)\W*[^.\n]{0,12}(신청|취소|개설|등록|확정)\w{0,3}\W*(했|해\s?드렸|완료|처리)"
+            r"(제가|방금|대신)\W*(?:(?!않|못|거나)[^.\n]){0,12}(신청|취소|개설|등록|확정)\w{0,3}\W*"
+            r"(했(?!다고)|해\s?드렸|완료|처리)"
         ),
     ),
 )

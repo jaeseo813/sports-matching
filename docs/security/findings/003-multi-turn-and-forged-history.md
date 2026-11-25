@@ -10,7 +10,7 @@
 - 답을 낼 때 `message` 이벤트에 `history`(이력에 넣을 문자열, 띄운 버튼 포함)와 `sig`(서명)를 함께 보낸다.
 - 클라이언트(`ChatPanel.tsx`)는 둘 다 손대지 않고 저장했다가 다음 요청에 돌려보낸다.
 - 서버는 assistant 메시지마다 서명을 확인한다. 서명이 없거나, 틀리거나, 내용을 바꿨거나, **다른 사용자가 받은 답**이면 거부하고 `FORGED_HISTORY` 이벤트를 남긴다. LLM은 부르지 않는다.
-- 키는 `jwt_secret`이고, 용도 접두어로 JWT 서명과 구분한다. DB는 바꾸지 않았다(대화 이력 30일 보관은 #31에서 따로 정한다).
+- 키는 `jwt_secret`이고, 용도 접두어로 JWT 서명과 구분한다. DB는 바꾸지 않았다(대화 이력은 서버에 저장하지 않기로 했다).
 
 회귀 테스트: `tests/security/test_chat_security.py`의 `test_forged_assistant_history_rejected`(3가지), `test_other_users_signed_answer_rejected`, `test_signed_history_round_trip`.
 

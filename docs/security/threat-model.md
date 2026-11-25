@@ -10,7 +10,7 @@
 | 스푸핑 (S) | 대화 이력에 가짜 assistant 답을 넣어 맥락 조작 | assistant 이력은 서버 서명(HMAC, 사용자에 묶임)이 맞을 때만 받음, user 이력은 입력 가드 | 구현([003](findings/003-multi-turn-and-forged-history.md)) |
 | 변조 (T) | 공지·닉네임에 숨긴 지시문(간접 인젝션) | 도구 결과를 `<data>`로 감싸고 안의 `<`를 이스케이프(구분자 탈출 불가), 시스템 프롬프트 | 구현. 실제 공격에서 LLM이 따르지 않음([002](findings/002-chatbot-live-redteam.md)) |
 | 변조 (T) | 여러 턴에 나눠 조금씩 빼내기 | 막힌 턴은 이력에서 빠짐, 시스템 프롬프트 | 재현 안 됨([003](findings/003-multi-turn-and-forged-history.md)) |
-| 변조 (T) | 직접 인젝션·탈옥 | 입력 가드(규칙 → LLM 분류) → 시스템 프롬프트 | v2 결합. 세트 내 우회 모두 차단, 분류기 자체도 인젝션 대상 |
+| 변조 (T) | 직접 인젝션·탈옥 | 입력 가드(규칙 → LLM 분류) → 시스템 프롬프트. 분류가 막을 입력도 LLM에는 닿을 수 있다(첫 호출과 동시 실행, 결과는 버림) | v2 결합. 세트 내 우회 모두 차단, 분류기 자체도 인젝션 대상 |
 | 부인 (R) | 차단된 요청의 기록이 없음 | `record_security_event` (사유 코드만, 원문 없음) | 구현 |
 | 정보 노출 (I) | 시스템 프롬프트 추출 | 입력 `PROMPT_EXTRACTION`(규칙 → LLM), 시스템 프롬프트(요약·바꿔 말하기도 거절), 출력 `PROMPT_LEAK`(규칙 → LLM) | 실제 공격 재검증([002](findings/002-chatbot-live-redteam.md), [004](findings/004-output-guard-paraphrase.md)). 예/아니오로 규칙 존재 확인은 받아들임 |
 | 정보 노출 (I) | 응답 속 이메일·전화·좌표·주소, 숫자 레이팅 | 출력 가드 마스킹·`RATING_LEAK`·`PERSONAL_INFO`, 도구 스키마에서 PII 제외 | 규칙 → LLM. 실명이라고 밝히지 않은 이름은 못 잡을 수 있음 |

@@ -33,6 +33,7 @@
   - 출력 차단: `PROMPT_LEAK`, `HTML`, `LINK`, `RATING_LEAK`, `WRITE_CLAIM`, `PERSONAL_INFO`, `OFF_TOPIC` / 마스킹 후 통과: `PII_OUTPUT`
   - 입력·출력 모두 규칙을 통과하면 DeepSeek으로 한 번 더 분류한다(마스킹한 값만). 키가 없으면 규칙만, 분류 실패는 차단(`GUARD_UNAVAILABLE` → 챗봇은 필터 UI로 degrade).
   - 차단·마스킹 모두 `record_security_event("chat_input_blocked" | "chat_output_blocked", code)` → 대시보드 "챗봇 가드 차단 사유별" 패널.
+- 지연: 규칙·마스킹을 통과하면(`screen_input`) 첫 LLM 호출을 입력 분류와 동시에 시작한다. 분류가 막으면 답을 버리고(도구 실행·화면 출력 없음) 토큰만 센다. 판정·기록은 `check_input`이 그대로 한다.
 - 챗봇(`services/chatbot.py`): user 이력은 메시지마다 입력 가드를 거친다. assistant 이력은 서버가 답과 함께 준 서명(`sig`)이 맞을 때만 받는다(위조 방지). 사용자당 24시간 토큰 상한이 있다(`DAILY_TOKEN_LIMIT`, 가드 분류 호출 포함).
 - 공격 세트 `backend/tests/security/chat_attacks/`(규칙 세트, LLM이 맡는 `known_bypass`·`output_bypass`, 시험지 `holdout*`·`output_holdout_*` — 쓰는 법은 그 폴더 README), 회귀 테스트 `tests/security/test_chat_guard.py`(pytest에서는 LLM 분류기를 끈다).
 - 실제 평가: `cd backend && uv run python -m tests.security.test_chat_guard` (DeepSeek 호출, 2분쯤).
@@ -43,7 +44,7 @@
 1. Red 계속(W13): 다른 종목·다른 사용자로 반복하고 시나리오를 키운다(지금은 여러 턴 10개). 결과는 `findings/NNN-*.md`.
 2. ~~출력 LLM 분류 비교~~ → 붙였다([004](findings/004-output-guard-paraphrase.md)). 예/아니오로 규칙 존재를 확인하는 것은 막지 않는다.
 3. ~~챗봇 전체 요청 수 카운터~~ → B에서 추가함(`teamup_chat_requests_total`, 가드 검사 수 `teamup_chat_guard_checks_total`). `check_input`·`check_output` 첫 줄의 `count_guard_check`는 지우지 않는다(차단율의 분모).
-4. 대화 이력 30일 보관·탈퇴 시 삭제는 #31(배포 준비)에서 정한다.
+4. ~~대화 이력 30일 보관·탈퇴 시 삭제~~ → 구현하지 않기로 함(2026-11-25). 서버에 저장하지 않으므로 지울 이력도 없다.
 
 ## B. 보안 대시보드 (Grafana)
 
