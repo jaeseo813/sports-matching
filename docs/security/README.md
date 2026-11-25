@@ -19,7 +19,7 @@
   - `code`는 사유 코드(`INVALID_CREDENTIALS`, `FORBIDDEN`, `PROMPT_INJECTION` 등), `route`는 `/matches/{match_id}` 같은 템플릿(`/api/v1` 제외).
   - **원문 입력·토큰·이메일·좌표는 넘기지 않는다.** 라벨 값 종류가 무한히 늘어나도 안 된다(사용자 id, 매치 id 금지).
 - 401·403·429는 `app/main.py`의 예외 처리기가 **자동으로** 남긴다. 서비스 코드에서 따로 부를 필요 없다.
-- 수집: `GET /metrics` (Prometheus 형식, 인증 없음 — 로컬·스테이징 전용).
+- 수집: `GET /metrics` (Prometheus 형식). `.env`의 `METRICS_TOKEN`이 있으면 `Authorization: Bearer <값>`이 맞아야 하고, 비어 있으면 `ENV=local`에서만 열린다(B 절 "/metrics 보호").
 - 테스트: `tests/security/test_security_events.py`
 
 ## A. 챗봇 가드레일
@@ -42,7 +42,7 @@
 **남은 할 일**
 1. Red 계속(W13): 다른 종목·다른 사용자로 반복하고 시나리오를 키운다(지금은 여러 턴 10개). 결과는 `findings/NNN-*.md`.
 2. ~~출력 LLM 분류 비교~~ → 붙였다([004](findings/004-output-guard-paraphrase.md)). 예/아니오로 규칙 존재를 확인하는 것은 막지 않는다.
-3. 챗봇 전체 요청 수 카운터(대시보드 차단율용, B와 함께).
+3. ~~챗봇 전체 요청 수 카운터~~ → B에서 추가함(`teamup_chat_requests_total`, 가드 검사 수 `teamup_chat_guard_checks_total`). `check_input`·`check_output` 첫 줄의 `count_guard_check`는 지우지 않는다(차단율의 분모).
 4. 대화 이력 30일 보관·탈퇴 시 삭제는 #31(배포 준비)에서 정한다.
 
 ## B. 보안 대시보드 (Grafana)
@@ -78,7 +78,9 @@ docker compose --profile monitoring up -d
   | 로그인 실패 (1분) | `INVALID_CREDENTIALS` 수 |
   | 403이 많은 경로 Top 5 | 선택한 범위 동안 403이 많은 route |
   | 레이트리밋 | 429 수(경로별) |
-  | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 (A 파트가 이벤트를 남기면 바로 채워진다) |
+  | 챗봇 가드 차단 사유별 | `chat_input_blocked`·`chat_output_blocked`의 사유 코드별 수 |
+  | 챗봇 가드 차단율 | 가드 **검사 기준** 차단 비율(입력·출력). 개인정보 마스킹(`PII_*`)은 따로, 가드 장애(`GUARD_UNAVAILABLE`)와 이력 위조(`FORGED_HISTORY`, 입력 가드 검사 전에 막혀 분모에 없음 — "차단 사유별"에는 보인다)는 뺀다. 입력 가드는 요청마다 이력의 사용자 메시지를 전부 다시 검사하므로 입력 차단율은 이력 재검사를 포함한다 — 공격 메시지 수 기준이 아니다(아래 "알려진 한계"). 출력 가드는 새 답만 검사한다 |
+  | 챗봇 요청 수 | 로그인·레이트리밋을 통과한 챗봇 요청 수 |
 
   패널은 모두 `increase()`로 증가량만 그린다(uvicorn `--reload`로 카운터가 0이 돼도 그래프가 꺾이지 않게).
   대시보드는 파일로만 관리한다(화면에서 저장 불가). 고치려면 화면에서 수정 → JSON 내보내기 → 이 파일에 커밋, 데이터소스 uid는 `teamup-prometheus` 유지.
@@ -91,13 +93,23 @@ docker compose --profile monitoring up -d
    - Prometheus는 **새로 생긴 시계열의 첫 값은 증가로 세지 않는다**. API를 띄운 뒤 처음 나는 이벤트는 그래프에 안 보이므로, 종류마다 한 번씩 미리 발생시킨다.
    - 로그인 한도(1분 5회)를 본 실행에 남겨 두려고 시드 계정 토큰을 미리 받아 둔다.
 2. 1분 뒤, 발표 중: 대시보드를 띄워 두고 `bash infra/monitoring/demo.sh`.
-   ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403.
+   ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403 ④ 챗봇에 600자 입력 3회 → 입력 가드 `TOO_LONG` 차단(규칙만으로 막혀 DeepSeek를 부르지 않는다. 서버에 `DEEPSEEK_API_KEY`가 없으면 503으로 끝나고 차단율은 비어 있다).
    10초쯤 뒤 패널이 올라가고 `LoginFailureBurst`·`ForbiddenBurst` 경보가 울린다.
 3. API를 재시작했다면 1부터 다시 한다.
 
-**남은 일**
-- 챗봇 **차단율**: 챗봇 전체 요청 수 카운터가 필요하다. 챗봇 본체를 만들 때 A와 함께 카운터를 추가하면 패널 하나만 더하면 된다.
-- `/metrics`가 인증 없이 열려 있는 점은 C와 같이 정한다(내부망만 허용 / 토큰 / 그대로 두고 위협 모델에 기록). 지금은 `127.0.0.1` 전용 + 외부 배포 금지로 둔다.
+**/metrics 보호 (토큰)**
+- 방식: `.env`의 `METRICS_TOKEN`. API는 `Authorization: Bearer <값>`이 맞을 때만 지표를 준다(비교는 `secrets.compare_digest`). 틀리면 401 `METRICS_UNAUTHORIZED`이고 보안 이벤트(`unauthorized`, route `/metrics`)로도 남는다.
+- 비워 두면 `ENV=local`에서만 열리고, `ENV`를 `staging`·`production`으로 둔 서버에서는 항상 401이다. `ENV`의 기본값이 `local`이니 스테이징 서버는 `ENV`를 꼭 지정한다.
+- 값은 `openssl rand -hex 32`로 만든다(영문·숫자 64자). `/metrics`에는 레이트리밋이 없어 긴 무작위 값이 유일한 방어이고, `$`·공백이 들어가면 compose와 API가 다르게 읽어 수집이 끊긴다.
+- Prometheus는 같은 `.env` 값을 compose가 넘겨 받아 시작할 때 `/prometheus/metrics_token` 파일로 쓰고 그 값으로 수집한다. 토큰은 레포·이미지에는 남지 않지만, 컨테이너 환경변수라 `docker inspect`로는 보인다(로컬 개발용 수준).
+- 토큰을 넣거나 바꾸면 **API와 Prometheus를 둘 다 다시 띄운다**(`docker compose --profile monitoring up -d --force-recreate prometheus`). 한쪽만 바꾸면 수집 상태가 "수집 중단"이 되고, 5초마다 401 이벤트가 쌓인다.
+- 고른 이유: 내 컴퓨터 요청만 허용하는 방식은 Docker를 거친 요청이 운영체제마다 다른 주소로 보여 깨지기 쉽다. 토큰은 Mac·Windows·Linux에서 같게 동작하고, "토큰 없이 요청하면 막힌다"를 데모로 보일 수 있다.
+
+**알려진 한계 (A와 같이 볼 것)**
+- 챗봇은 요청마다 이력의 사용자 메시지를 전부 입력 가드에 다시 넣는다(`chatbot.chat_events`). 그래서 긴 대화일수록 같은 질문이 여러 번 검사·기록되고, 입력 차단율은 공격 메시지 수가 아니라 검사 기준이 된다. (assistant 이력은 #35부터 서명으로 검증하고 출력 가드는 새 답만 본다.)
+- 화면은 막힌 질문(`INPUT_BLOCKED`)을 이력에서 빼므로 정상 사용에서는 같은 차단이 다시 쌓이지 않는다. 이력에서 걸린 차단은 직접 만든 요청일 수 있어 계속 기록한다. 개인정보가 든 이력은 요청마다 `PII_INPUT`이 다시 기록된다.
+
+새 보안 이벤트 종류가 생기면 Literal과 대시보드를 같은 PR에서 고친다.
 
 ## C. RBAC 정책
 

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-flash"
     kakao_map_key: str = ""
+    # /metrics 보호: 있으면 Authorization: Bearer <값>이 맞아야 한다. 비우면 local에서만 열린다
+    metrics_token: str = ""
 
     @property
     def is_production(self) -> bool:

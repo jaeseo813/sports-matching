@@ -2,6 +2,7 @@
 from httpx import AsyncClient
 from prometheus_client import REGISTRY
 
+from app.core.config import get_settings
 from app.services.chat_guard import MAX_INPUT_CHARS, check_input, check_output
 from tests.test_auth_api import SIGNUP, FakeUserRepo, api, repo  # noqa: F401
 
@@ -22,7 +23,8 @@ async def test_unauthorized_and_login_failure_are_counted(api: AsyncClient) -> N
 
 async def test_metrics_endpoint_exposes_counter(api: AsyncClient) -> None:
     await api.get("/api/v1/auth/me")
-    res = await api.get("/metrics")
+    token = get_settings().metrics_token  # .env에 METRICS_TOKEN을 넣은 개발 환경에서도 통과하게
+    res = await api.get("/metrics", headers={"authorization": f"Bearer {token}"} if token else {})
     assert res.status_code == 200
     assert "teamup_security_events_total" in res.text
 

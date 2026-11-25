@@ -88,7 +88,7 @@ def test_dashboard_events_exist_in_code() -> None:
 def test_panels_use_increase_or_rate() -> None:
     # 카운터 원값은 uvicorn --reload 때 0으로 돌아가 그래프가 꺾인다. 증가량만 그린다.
     for expr in _exprs():
-        if "teamup_security_events_total" in expr:
+        if re.search(r"teamup_\w+_total", expr):
             assert "increase(" in expr or "rate(" in expr, expr
 
 
@@ -126,3 +126,23 @@ def test_alert_rules_use_known_events() -> None:
     exprs = _alert_exprs()
     assert exprs, "alerts.yml에서 expr를 못 찾았다"
     assert _event_values(exprs) <= set(get_args(SecurityEvent))
+
+
+def test_block_rate_divides_by_guard_checks() -> None:
+    # 가드는 요청마다 대화 이력 전체를 다시 검사한다. 요청 수로 나누면 100%를 넘을 수 있다.
+    rates = [e for e in _exprs() if "chat_" in e and "/" in e]
+    assert rates, "챗봇 차단율 패널이 없다"
+    for expr in rates:
+        assert "teamup_chat_guard_checks_total" in expr.split("/", 1)[1], expr
+
+
+def test_block_rate_excludes_outage_and_handles_zero() -> None:
+    # 가드 장애(GUARD_UNAVAILABLE)는 공격이 아니다. 차단이 아직 없으면 0%, 검사가 없으면 비운다(NaN 금지).
+    rates = [e for e in _exprs() if "chat_" in e and "/" in e]
+    for expr in rates:
+        if "PII_" in expr and 'code=~"PII_' not in expr:
+            assert "GUARD_UNAVAILABLE" in expr, expr
+            # 이력 위조(FORGED_HISTORY)는 입력 가드 검사 전에 막혀 분모에 안 들어간다. 분자에 넣으면 100%를 넘는다
+            assert "FORGED_HISTORY" in expr, expr
+        assert "or vector(0)" in expr, expr
+        assert ") > 0" in expr, expr

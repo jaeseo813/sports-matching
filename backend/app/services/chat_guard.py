@@ -21,7 +21,7 @@ from functools import lru_cache
 from openai import APIError, AsyncOpenAI
 
 from app.core.config import get_settings
-from app.core.security_events import record_security_event
+from app.core.security_events import count_guard_check, record_security_event
 
 MAX_INPUT_CHARS = 500
 _log = logging.getLogger("teamup.chat")
@@ -120,6 +120,7 @@ def mask_pii(text: str) -> tuple[str, bool]:
 
 
 async def check_input(text: str) -> GuardResult:
+    count_guard_check("input")
     if len(text) > MAX_INPUT_CHARS:
         record_security_event("chat_input_blocked", "TOO_LONG")
         return GuardResult(allowed=False, text="", code="TOO_LONG")
@@ -280,6 +281,7 @@ _OUTPUT_BLOCK_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 async def check_output(text: str) -> GuardResult:
+    count_guard_check("output")
     # 마스킹을 먼저 해서 이메일 주소가 링크 규칙에 걸려 답 전체가 막히지 않게 한다
     masked, changed = mask_pii(text)
     compact = _compact(masked)

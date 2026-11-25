@@ -10,5 +10,8 @@ rule_files:
 scrape_configs:
   - job_name: teamup-api
     metrics_path: /metrics
+    authorization:            # .env의 METRICS_TOKEN (compose가 컨테이너 시작 때 이 파일로 쓴다)
+      type: Bearer
+      credentials_file: /prometheus/metrics_token
     static_configs:
       - targets: ["host.docker.internal:8000"]

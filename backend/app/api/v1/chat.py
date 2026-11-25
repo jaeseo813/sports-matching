@@ -10,6 +10,7 @@ from openai import AsyncOpenAI
 from app.api.deps import CurrentUser, MatchRepo, ProfileRepo, RecommendRepo, UserRepo, VenueRepo
 from app.core.config import get_settings
 from app.core.ratelimit import RateLimiter
+from app.core.security_events import CHAT_REQUESTS
 from app.schemas.chat import ChatIn
 from app.services import chatbot
 
@@ -48,6 +49,7 @@ async def chat(
     users: UserRepo,
     venues: VenueRepo,
 ) -> StreamingResponse:
+    CHAT_REQUESTS.inc()
     if llm is None:
         raise HTTPException(
             status_code=503, detail={"code": "CHATBOT_UNAVAILABLE", "message": chatbot.UNAVAILABLE}
