@@ -1,4 +1,5 @@
 from app.sports.base import SportRules
+from app.sports.basketball.faq import FAQ
 
 RULES = SportRules(
     id="basketball",
@@ -14,3 +15,5 @@ RULES = SportRules(
         5: "높은 경기 이해도와 숙련도를 바탕으로 팀을 이끌 수 있는 단계",
     },
 )
+
+__all__ = ["FAQ", "RULES"]
