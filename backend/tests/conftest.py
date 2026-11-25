@@ -71,12 +71,13 @@ async def client() -> AsyncIterator[AsyncClient]:
 def _no_live_guard_classifier(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """입력 가드의 LLM 분류는 실제 DeepSeek을 부른다. 테스트에서는 꺼 두고(규칙만), 분류기 테스트가 직접 흉내 낸다."""
+    """가드의 LLM 분류는 실제 DeepSeek을 부른다. 테스트에서는 꺼 두고(규칙만), 분류기 테스트가 직접 흉내 낸다."""
     if "classifier" in request.keywords:
         return
     from app.services import chat_guard
 
-    async def rules_only(text: str) -> str | None:
-        return None
+    async def rules_only(text: str) -> tuple[str | None, int]:
+        return None, 0
 
     monkeypatch.setattr(chat_guard, "classify_input", rules_only)
+    monkeypatch.setattr(chat_guard, "classify_output", rules_only)

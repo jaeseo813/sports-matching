@@ -112,7 +112,8 @@ class FakeClassifier:
         if isinstance(self.reply, Exception):
             raise self.reply
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))]
+            choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))],
+            usage=SimpleNamespace(total_tokens=7),
         )
 
 
@@ -180,14 +181,47 @@ async def test_no_key_means_rules_only(monkeypatch: pytest.MonkeyPatch) -> None:
     assert fake.calls == []
 
 
+@pytest.mark.classifier
+@pytest.mark.parametrize(
+    ("reply", "code"),
+    [
+        ('{"label": "ok"}', None),
+        ('{"label": "prompt_leak"}', "PROMPT_LEAK"),
+        ('{"label": "write_claim"}', "WRITE_CLAIM"),
+        ('{"label": "rating_leak"}', "RATING_LEAK"),
+        ('{"label": "personal_info"}', "PERSONAL_INFO"),
+        ('{"label": "external_contact"}', "LINK"),
+        ('{"label": "off_topic"}', "OFF_TOPIC"),
+        ('{"label": "safe"}', "GUARD_UNAVAILABLE"),
+        ("", "GUARD_UNAVAILABLE"),
+    ],
+)
+async def test_output_classifier_labels(
+    monkeypatch: pytest.MonkeyPatch, reply: str, code: str | None
+) -> None:
+    use_classifier(monkeypatch, reply)
+    result = await check_output("매치 신청이 완료되었습니다.")
+    assert (result.allowed, result.code, result.tokens) == (code is None, code, 7)
+
+
+@pytest.mark.classifier
+async def test_output_classifier_gets_masked_text_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = use_classifier(monkeypatch, '{"label": "ok"}')
+    result = await check_output("연락처는 010-2222-3333이에요")
+    sent = str(fake.calls[0]["messages"])
+    assert "010-2222-3333" not in sent and "[전화번호]" in sent
+    assert result.code == "PII_OUTPUT"
+
+
 def _report(rules_only: bool) -> None:
     """세트별 판정 결과 표 (docs/security/chat-guard-eval.md에 붙인다)."""
     if rules_only:
 
-        async def no_llm(text: str) -> str | None:
-            return None
+        async def no_llm(text: str) -> tuple[str | None, int]:
+            return None, 0
 
-        chat_guard.classify_input = no_llm  # type: ignore[assignment]
+        chat_guard.classify_input = no_llm
+        chat_guard.classify_output = no_llm
 
     async def run() -> None:
         rows: list[tuple[str, int, int, float]] = []

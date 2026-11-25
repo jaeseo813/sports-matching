@@ -47,7 +47,7 @@ MAX_RESULTS = 5
 MAX_ACTIONS = 3
 UNAVAILABLE = "지금은 챗봇이 응답하지 못해요. 매치 목록의 필터로 찾아 주세요."
 # 토큰 상한: 서버 세션이 없어 사용자당 최근 24시간으로 센다. 레이트리밋처럼 인메모리(재시작하면 초기화).
-# 20/5분 레이트리밋 안에서도 긴 대화·도구 반복으로 비용을 키우는 공격을 막는다. 입력 가드 분류 호출은 세지 않는다
+# 20/5분 레이트리밋 안에서도 긴 대화·도구 반복으로 비용을 키우는 공격을 막는다. 가드의 LLM 분류 호출도 센다
 DAILY_TOKEN_LIMIT = 200_000
 token_usage: dict[int, list[tuple[float, int]]] = defaultdict(list)
 
@@ -56,6 +56,11 @@ def _tokens_used(user_id: int) -> int:
     now = time.monotonic()
     token_usage[user_id] = [(t, n) for t, n in token_usage[user_id] if now - t < 86_400]
     return sum(n for _, n in token_usage[user_id])
+
+
+def _add_tokens(user_id: int, tokens: int) -> None:
+    if tokens:
+        token_usage[user_id].append((time.monotonic(), tokens))
 
 
 # 앞부분을 고정해 두어야 DeepSeek 자동 캐시(접두사 일치)에 걸린다. 요청마다 바뀌는 값은 뒤 메시지로.
@@ -374,6 +379,7 @@ async def chat_events(
     # 입력 가드는 LLM 분류를 부르므로 동시에 검사해 지연을 한 번으로 묶는다
     user_msgs = [m for m in data.messages if m.role == "user"]
     results = await asyncio.gather(*(check_input(m.content) for m in user_msgs))
+    _add_tokens(ctx.user.id, sum(r.tokens for r in results))
     if any(r.code == "GUARD_UNAVAILABLE" for r in results):
         yield {"type": "error", "code": "CHATBOT_UNAVAILABLE", "message": UNAVAILABLE}
         return
@@ -411,7 +417,7 @@ async def chat_events(
             )
             _log_usage(resp.usage)
             if resp.usage:
-                token_usage[ctx.user.id].append((time.monotonic(), resp.usage.total_tokens))
+                _add_tokens(ctx.user.id, resp.usage.total_tokens)
             msg = resp.choices[0].message
             if msg.content and msg.content.strip():
                 parts.append(msg.content.strip())
@@ -435,6 +441,10 @@ async def chat_events(
         return
 
     guard_out = await check_output("\n\n".join(parts))
+    _add_tokens(ctx.user.id, guard_out.tokens)
+    if guard_out.code == "GUARD_UNAVAILABLE":
+        yield {"type": "error", "code": "CHATBOT_UNAVAILABLE", "message": UNAVAILABLE}
+        return
     if not guard_out.allowed:
         yield {
             "type": "error",

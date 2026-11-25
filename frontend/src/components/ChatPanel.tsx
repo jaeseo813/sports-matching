@@ -19,7 +19,7 @@ interface Turn {
   role: "user" | "assistant";
   text: string;
   actions?: { label: string; href: string }[];
-  error?: boolean; // 오류 안내는 대화 이력으로 서버에 보내지 않는다
+  error?: boolean; // 오류 안내와 입력 가드에 막힌 질문은 대화 이력으로 서버에 보내지 않는다
   // 서버가 준 이력용 문자열(띄운 버튼 포함)과 서명. 다음 질문 때 손대지 않고 그대로 돌려보낸다(위조 방지)
   history?: string;
   sig?: string;
@@ -84,6 +84,7 @@ function Conversation({ sport, suggestions, autoFocus }: { sport: string | null;
     setStatus("생각하고 있어요");
 
     const reply: Turn = { role: "assistant", text: "", actions: [] };
+    let blocked = false; // 막힌 질문을 다시 보내면 그 뒤 질문까지 계속 막힌다
     try {
       await postStream<ChatEvent>("/chat", { sport, messages }, (e) => {
         if (e.type === "status") setStatus(e.text);
@@ -92,6 +93,7 @@ function Conversation({ sport, suggestions, autoFocus }: { sport: string | null;
         else if (e.type === "error") {
           reply.text = e.message;
           reply.error = true;
+          blocked = e.code === "INPUT_BLOCKED";
         }
       });
     } catch (e) {
@@ -103,7 +105,7 @@ function Conversation({ sport, suggestions, autoFocus }: { sport: string | null;
             ? e.message
             : "지금은 챗봇이 응답하지 못해요. 매치 목록의 필터로 찾아 주세요.";
     } finally {
-      setTurns((prev) => [...prev, reply]);
+      setTurns((prev) => [...prev.slice(0, -1), { role: "user", text: question, error: blocked }, reply]);
       setStatus(null);
       setBusy(false);
     }

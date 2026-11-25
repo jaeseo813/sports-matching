@@ -14,10 +14,15 @@
 | `output_pii.txt` | 출력 | 통과하되 개인정보 마스킹 |
 | `output_benign.txt` | 출력 | 그대로 통과 (오탐 측정) |
 | `known_bypass.txt` | 입력 | 규칙은 통과, **LLM 분류**가 차단 |
+| `output_bypass.txt` | 출력 | 규칙은 통과, **LLM 분류**가 차단 |
+| `output_holdout_attacks.txt` | 출력 | 차단 — 시험지 |
+| `output_holdout_benign.txt` | 출력 | 통과 — 시험지(오탐) |
+| `holdout2_attacks.txt` | 입력 | 차단 — 시험지 2차 |
+| `holdout2_benign.txt` | 입력 | 통과 — 시험지 2차(오탐) |
 | `holdout_attacks.txt` | 입력 | 차단 — 시험지 |
 | `holdout_benign.txt` | 입력 | 통과 — 시험지(오탐) |
 
-- `input_*`·`output_*`은 **규칙만으로** 기대대로 판정돼야 한다 → pytest 회귀 테스트 (`test_chat_guard.py`, LLM 분류기는 꺼 둠).
-- `known_bypass`·`holdout_*`은 LLM 분류까지 붙인 실제 평가로만 잰다: `uv run python -m tests.security.test_chat_guard`.
-- **`holdout_*`에 맞춰 규칙이나 분류 프롬프트를 고치지 않는다.** 고쳤다면 그 세트는 시험지 역할을 잃었으니 새로 써서 바꾼다.
+- `input_*`·`output_block/pii/benign`은 **규칙만으로** 기대대로 판정돼야 한다 → pytest 회귀 테스트 (`test_chat_guard.py`, LLM 분류기는 꺼 둠).
+- `known_bypass`·`output_bypass`·`holdout*`·`output_holdout_*`은 LLM 분류까지 붙인 실제 평가로만 잰다: `uv run python -m tests.security.test_chat_guard`.
+- **`holdout*`·`output_holdout_*`에 맞춰 규칙이나 분류 프롬프트를 고치지 않는다.** 고쳤다면 그 세트는 시험지 역할을 잃었으니 새로 써서 바꾼다.
 - 새 우회를 찾으면 `docs/security/findings/`에 기록하고, 규칙으로 막으면 `input_*`에, LLM이 막으면 `known_bypass.txt`에 둔다.
