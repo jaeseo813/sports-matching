@@ -26,22 +26,22 @@
 
 **목표**: 챗봇 입력·출력에 가드를 세우고, 공격 문장 세트로 우회 시도 → 보강 → 재검증한다 (AGENTS.md 5절).
 
-**지금 있는 것** (v2 결합: 입력은 규칙 → LLM 분류, 출력은 규칙)
+**지금 있는 것** (v3 결합: 입력·출력 모두 규칙 → LLM 분류)
 - `services/chat_guard.py`: `check_input(text)`, `check_output(text)` → `GuardResult(allowed, text, code)`.
   두 함수는 `async`다(LLM 판정이 들어올 수 있게). **함수 모양은 유지하고 안쪽만 바꾼다** — 챗봇 쪽이 이 두 함수만 부른다.
   - 입력 차단: `TOO_LONG`, `PROMPT_EXTRACTION`, `PROMPT_INJECTION`, `OTHERS_INFO`, `OUT_OF_SCOPE` / 마스킹 후 통과: `PII_INPUT`
-  - 출력 차단: `PROMPT_LEAK`, `HTML`, `LINK`, `RATING_LEAK`, `WRITE_CLAIM` / 마스킹 후 통과: `PII_OUTPUT`
-  - 입력은 규칙을 통과하면 DeepSeek으로 한 번 더 분류한다(마스킹한 값만). 키가 없으면 규칙만, 분류 실패는 차단(`GUARD_UNAVAILABLE` → 챗봇은 필터 UI로 degrade).
+  - 출력 차단: `PROMPT_LEAK`, `HTML`, `LINK`, `RATING_LEAK`, `WRITE_CLAIM`, `PERSONAL_INFO`, `OFF_TOPIC` / 마스킹 후 통과: `PII_OUTPUT`
+  - 입력·출력 모두 규칙을 통과하면 DeepSeek으로 한 번 더 분류한다(마스킹한 값만). 키가 없으면 규칙만, 분류 실패는 차단(`GUARD_UNAVAILABLE` → 챗봇은 필터 UI로 degrade).
   - 차단·마스킹 모두 `record_security_event("chat_input_blocked" | "chat_output_blocked", code)` → 대시보드 "챗봇 가드 차단 사유별" 패널.
-- 챗봇(`services/chatbot.py`): user 이력은 메시지마다 입력 가드를 거친다. assistant 이력은 서버가 답과 함께 준 서명(`sig`)이 맞을 때만 받는다(위조 방지). 사용자당 24시간 토큰 상한이 있다(`DAILY_TOKEN_LIMIT`).
-- 공격 세트 `backend/tests/security/chat_attacks/`(규칙 세트, LLM이 맡는 `known_bypass`, 시험지 `holdout_*` — 쓰는 법은 그 폴더 README), 회귀 테스트 `tests/security/test_chat_guard.py`(pytest에서는 LLM 분류기를 끈다).
-- 실제 평가: `cd backend && uv run python -m tests.security.test_chat_guard` (DeepSeek 호출, 1분쯤).
-- 실제 챗봇 공격: `uv run python -m tests.security.redteam_chat 결과.json` (시드 데이터 필요, 3분쯤). 입력 가드를 끈 모드도 함께 돌려 다층 방어를 본다. 결과 [findings/002](findings/002-chatbot-live-redteam.md).
+- 챗봇(`services/chatbot.py`): user 이력은 메시지마다 입력 가드를 거친다. assistant 이력은 서버가 답과 함께 준 서명(`sig`)이 맞을 때만 받는다(위조 방지). 사용자당 24시간 토큰 상한이 있다(`DAILY_TOKEN_LIMIT`, 가드 분류 호출 포함).
+- 공격 세트 `backend/tests/security/chat_attacks/`(규칙 세트, LLM이 맡는 `known_bypass`·`output_bypass`, 시험지 `holdout*`·`output_holdout_*` — 쓰는 법은 그 폴더 README), 회귀 테스트 `tests/security/test_chat_guard.py`(pytest에서는 LLM 분류기를 끈다).
+- 실제 평가: `cd backend && uv run python -m tests.security.test_chat_guard` (DeepSeek 호출, 2분쯤).
+- 실제 챗봇 공격: `uv run python -m tests.security.redteam_chat 결과.json` (시드 데이터 필요, 10분쯤). 입력 가드를 끈 모드도 함께 돌려 다층 방어를 본다. 결과 [findings/002](findings/002-chatbot-live-redteam.md), [findings/004](findings/004-output-guard-paraphrase.md).
 - 평가 표 [chat-guard-eval.md](chat-guard-eval.md), 우회 기록 [findings/001](findings/001-rule-guard-bypass.md).
 
 **남은 할 일**
-1. Red 계속: 공격 세트와 여러 턴 시나리오를 키운다(지금은 공격 약 80개, 여러 턴 5개). 결과는 `findings/NNN-*.md`.
-2. 출력 가드는 표지 문구 검사라 바꿔 말한 프롬프트 노출을 못 잡는다. 지금은 시스템 프롬프트와 입력 분류기, 두 겹이 막는다. 필요하면 출력에도 LLM 분류를 붙여 비교한다.
+1. Red 계속(W13): 다른 종목·다른 사용자로 반복하고 시나리오를 키운다(지금은 여러 턴 10개). 결과는 `findings/NNN-*.md`.
+2. ~~출력 LLM 분류 비교~~ → 붙였다([004](findings/004-output-guard-paraphrase.md)). 예/아니오로 규칙 존재를 확인하는 것은 막지 않는다.
 3. ~~챗봇 전체 요청 수 카운터~~ → B에서 추가함(`teamup_chat_requests_total`, 가드 검사 수 `teamup_chat_guard_checks_total`). `check_input`·`check_output` 첫 줄의 `count_guard_check`는 지우지 않는다(차단율의 분모).
 4. 대화 이력 30일 보관·탈퇴 시 삭제는 #31(배포 준비)에서 정한다.
 
@@ -107,8 +107,7 @@ docker compose --profile monitoring up -d
 
 **알려진 한계 (A와 같이 볼 것)**
 - 챗봇은 요청마다 이력의 사용자 메시지를 전부 입력 가드에 다시 넣는다(`chatbot.chat_events`). 그래서 긴 대화일수록 같은 질문이 여러 번 검사·기록되고, 입력 차단율은 공격 메시지 수가 아니라 검사 기준이 된다. (assistant 이력은 #35부터 서명으로 검증하고 출력 가드는 새 답만 본다.)
-- 화면(`ChatPanel`)은 막힌 사용자 질문을 이력에 남겨 다음 요청마다 다시 보내서, 한 번 막힌 대화는 계속 막히고 차단 이벤트도 매번 다시 쌓인다.
-- 해결 방향: 이력의 사용자 메시지는 기록 없이 검사하고 마지막 메시지만 기록·집계, 화면은 막힌 질문을 이력에서 뺀다. 가드·챗봇 담당(A)이 정할 일이다.
+- 화면은 막힌 질문(`INPUT_BLOCKED`)을 이력에서 빼므로 정상 사용에서는 같은 차단이 다시 쌓이지 않는다. 이력에서 걸린 차단은 직접 만든 요청일 수 있어 계속 기록한다. 개인정보가 든 이력은 요청마다 `PII_INPUT`이 다시 기록된다.
 
 새 보안 이벤트 종류가 생기면 Literal과 대시보드를 같은 PR에서 고친다.
 

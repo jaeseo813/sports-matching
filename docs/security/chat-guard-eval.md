@@ -1,6 +1,6 @@
 # 챗봇 가드 평가
 
-**현재 채택: v2 결합 (규칙 → LLM 분류).** 아래 v1은 비교용 기록이다.
+**현재 채택: v3 결합 (입력·출력 모두 규칙 → LLM 분류).** 아래 v1·v2는 비교용 기록이다.
 
 같은 공격 세트(`backend/tests/security/chat_attacks/`)로 판정 방식을 비교한다 (AGENTS.md 5절).
 다시 재려면: `cd backend && uv run python -m tests.security.test_chat_guard`
@@ -82,6 +82,26 @@
 `/chat` + DeepSeek에 공격 33개를 두 모드(정상 / 입력 가드 끔)로 보냈다. 시스템 프롬프트를 바꿔 말하게 하는 노출과 `</data>` 구분자 탈출을 찾아 고쳤다.
 조치 뒤에는 입력 가드를 꺼도 LLM이 전부 거절했다 → [finding 002](findings/002-chatbot-live-redteam.md).
 여러 턴 공격 5개와 위조 이력은 [finding 003](findings/003-multi-turn-and-forged-history.md)에 정리했다. 위조 이력은 서명으로 막았고, 여러 턴 공격은 재현되지 않았다.
+
+## v3: 출력에도 LLM 분류 (2026-11-25)
+출력도 규칙을 통과한 답(마스킹한 값)만 분류한다. 시험지는 분류 프롬프트보다 먼저 썼다. 두 번 돌려 결과가 같았다.
+
+| 세트 | v2.1 | v3 | v3 평균 지연 (1회차 / 2회차) |
+|---|---|---|---|
+| `output_holdout_attacks.txt` (시험지) | 0 / 14 | **14 / 14** | 885 / 860ms |
+| `output_bypass.txt` | 0 / 6 | 6 / 6 | 893 / 791ms |
+| `output_holdout_benign.txt` (오탐, 시험지) | 0 / 16 | **0 / 16** | 839 / 909ms |
+| `output_benign.txt` (오탐) | 0 / 14 | 0 / 14 | 763 / 797ms |
+| `output_block.txt` | 14 / 14 | 14 / 14 | ~0ms (규칙에서 끝남) |
+| `output_pii.txt` (마스킹) | 7 / 7 | 7 / 7 | 696 / 743ms |
+| `holdout2_attacks.txt` (입력 새 시험지) | 20 / 20 | 20 / 20 | 810 / 841ms |
+| `holdout2_benign.txt` (입력 오탐, 새 시험지) | 0 / 18 | 0 / 18 | 848 / 866ms |
+
+나머지 입력 세트는 v2.1과 같다(규칙 세트 50/50, `known_bypass` 7/7, `holdout_attacks` 15/15, `input_pii` 10/10, 오탐 0/48).
+입력 가드 판정은 바꾸지 않았다. 대가로 답마다 약 0.8초와 LLM 호출 1회가 늘어, 가드 지연은 입력·출력 합쳐 약 1.6초다.
+
+실제 챗봇 공격 2차(공격 53개·여러 턴 10개·정상 33개, 두 모드)에서 출력 가드 차단은 0건, 정상 질문 오탐도 0건이었다.
+출력 분류기의 차단 능력은 손으로 쓴 답으로만 확인했다 → [finding 004](findings/004-output-guard-paraphrase.md).
 
 ## 방식 비교 요약
 
