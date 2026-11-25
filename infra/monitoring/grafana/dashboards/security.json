@@ -379,7 +379,7 @@
         "w": 8,
         "h": 8
       },
-      "description": "선택한 시간 범위의 가드 검사 대비 차단 비율(검사 기준). 입력 가드는 요청마다 이력의 사용자 메시지를 전부 다시 검사하므로 입력 차단율은 이력 재검사를 포함한다 — 공격 메시지 수 기준이 아니다. 출력 가드는 새 답만 검사한다. 개인정보 마스킹(PII_*)은 통과라서 따로, 가드 장애(GUARD_UNAVAILABLE)는 공격이 아니라서 뺀다. 차단이 없으면 0%, 검사가 없으면 '데이터 없음'.",
+      "description": "선택한 시간 범위의 가드 검사 대비 차단 비율(검사 기준). 입력 가드는 요청마다 이력의 사용자 메시지를 전부 다시 검사하므로 입력 차단율은 이력 재검사를 포함한다 — 공격 메시지 수 기준이 아니다. 출력 가드는 새 답만 검사한다. 개인정보 마스킹(PII_*)은 통과라서 따로, 가드 장애(GUARD_UNAVAILABLE)는 공격이 아니라서, 이력 위조(FORGED_HISTORY)는 입력 가드 검사 전에 막혀 분모에 없어서 뺀다(위조는 '차단 사유별' 패널에 보인다). 차단이 없으면 0%, 검사가 없으면 '데이터 없음'.",
       "targets": [
         {
           "refId": "A",
@@ -387,7 +387,7 @@
             "type": "prometheus",
             "uid": "teamup-prometheus"
           },
-          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_input_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"input\"}[$__range])) > 0)",
+          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_input_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"input\"}[$__range])) > 0)",
           "legendFormat": "입력 차단",
           "instant": true,
           "range": false
@@ -398,7 +398,7 @@
             "type": "prometheus",
             "uid": "teamup-prometheus"
           },
-          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_output_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"output\"}[$__range])) > 0)",
+          "expr": "(sum(increase(teamup_security_events_total{event=\"chat_output_blocked\",code!~\"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY\"}[$__range])) or vector(0)) / (sum(increase(teamup_chat_guard_checks_total{stage=\"output\"}[$__range])) > 0)",
           "legendFormat": "출력 차단",
           "instant": true,
           "range": false

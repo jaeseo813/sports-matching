@@ -142,5 +142,7 @@ def test_block_rate_excludes_outage_and_handles_zero() -> None:
     for expr in rates:
         if "PII_" in expr and 'code=~"PII_' not in expr:
             assert "GUARD_UNAVAILABLE" in expr, expr
+            # 이력 위조(FORGED_HISTORY)는 입력 가드 검사 전에 막혀 분모에 안 들어간다. 분자에 넣으면 100%를 넘는다
+            assert "FORGED_HISTORY" in expr, expr
         assert "or vector(0)" in expr, expr
         assert ") > 0" in expr, expr
