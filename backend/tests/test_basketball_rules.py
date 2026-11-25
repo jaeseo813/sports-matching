@@ -1,4 +1,3 @@
-
 from app.sports.basketball import FAQ, RULES
 
 
