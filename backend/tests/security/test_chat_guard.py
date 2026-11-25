@@ -20,7 +20,13 @@ import pytest
 from app.core.config import get_settings
 from app.core.security_events import SECURITY_EVENTS
 from app.services import chat_guard
-from app.services.chat_guard import MAX_INPUT_CHARS, check_input, check_output, mask_pii
+from app.services.chat_guard import (
+    MAX_INPUT_CHARS,
+    check_input,
+    check_output,
+    mask_pii,
+    screen_input,
+)
 
 ATTACKS = Path(__file__).parent / "chat_attacks"
 INPUT_BLOCK = {
@@ -81,6 +87,20 @@ async def test_output_pii_masked(text: str) -> None:
 async def test_benign_output_passes_unchanged(text: str) -> None:
     result = await check_output(text)
     assert (result.allowed, result.text, result.code) == (True, text, None)
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
+    cases(*INPUT_BLOCK, "input_pii.txt", "input_benign.txt"),
+)
+async def test_screen_matches_check_input(name: str, text: str) -> None:
+    # 미리 보내는 값은 check_input이 통과시키는 값과 같아야 한다(막을 입력·가리기 전 개인정보가 먼저 나가지 않게)
+    result = await check_input(text)
+    assert screen_input(text) == (result.text if result.allowed else None)
+
+
+async def test_screen_blocks_too_long() -> None:
+    assert screen_input("가" * (MAX_INPUT_CHARS + 1)) is None
 
 
 async def test_too_long_blocked() -> None:

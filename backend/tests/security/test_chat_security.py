@@ -1,6 +1,7 @@
 # ruff: noqa: F401, F811  (pytest 픽스처를 test_matches_api에서 가져와 쓴다)
 """챗봇 보안 회귀 테스트. 가드 담당(파트 A)이 공격 세트를 붙여 넓혀 갈 자리."""
 
+import asyncio
 import json
 from typing import Any
 
@@ -149,18 +150,63 @@ async def test_output_pii_masked_in_answer(api: AsyncClient) -> None:
     )  # 이력에도 마스킹한 값만
 
 
-async def test_guard_classifier_down_degrades_without_calling_llm(
+async def test_guard_classifier_down_degrades_without_using_answer(
     api: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def down(text: str) -> GuardResult:
         return GuardResult(allowed=False, text="", code="GUARD_UNAVAILABLE")
 
     monkeypatch.setattr(chatbot, "check_input", down)
-    fake = FakeLLM(text_reply("x"))
-    use_llm(fake)
+    use_llm(FakeLLM(text_reply("검사 전 답")))
     res = await api.post("/api/v1/chat", json=ask("풋살 매치"), headers=await login(api, 1))
     assert events(res.text)[0]["code"] == "CHATBOT_UNAVAILABLE"  # 필터 UI로 degrade
-    assert fake.calls == []
+    assert "검사 전 답" not in res.text
+
+
+async def test_first_llm_call_runs_while_classifying(
+    api: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = FakeLLM(text_reply("찾았어요"))
+    use_llm(fake)
+
+    async def waits_for_llm(text: str) -> GuardResult:
+        async with asyncio.timeout(2):  # 순서대로 실행하면 여기서 멈춘다
+            while not fake.calls:
+                await asyncio.sleep(0)
+        return GuardResult(allowed=True, text=text)
+
+    monkeypatch.setattr(chatbot, "check_input", waits_for_llm)
+    res = await api.post("/api/v1/chat", json=ask("풋살 매치"), headers=await login(api, 1))
+    assert events(res.text)[0]["text"] == "찾았어요"
+    assert len(fake.calls) == 1  # 미리 부른 결과를 쓴다. 두 번 부르지 않는다
+
+
+async def test_classifier_block_discards_early_answer(
+    api: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # LLM이 먼저 답해도 분류가 막으면 도구 실행도 화면 출력도 없다. 쓴 토큰은 센다
+    async def blocked(text: str) -> GuardResult:
+        await asyncio.sleep(0.05)  # LLM이 먼저 끝난다
+        return GuardResult(allowed=False, text="", code="PROMPT_INJECTION", tokens=7)
+
+    ran: list[str] = []
+
+    async def spy_tool(ctx: object, name: str, args: str) -> tuple[str, None]:
+        ran.append(name)
+        return "", None
+
+    reply = tool_reply("get_my_profile", {}, text="새어 나가면 안 되는 답")
+    reply.usage = text_reply("x").usage  # 15토큰
+    fake = FakeLLM(reply)
+    use_llm(fake)
+    monkeypatch.setattr(chatbot, "check_input", blocked)
+    monkeypatch.setattr(chatbot, "_run_tool", spy_tool)
+    headers = await login(api, 1)
+    res = await api.post("/api/v1/chat", json=ask("풋살 매치"), headers=headers)
+    assert [e["type"] for e in events(res.text)] == ["error", "done"]
+    assert "새어 나가면" not in res.text
+    assert ran == [] and len(fake.calls) == 1
+    assert sum(n for v in chatbot.token_usage.values() for _, n in v) == 15 + 7
 
 
 async def test_output_classifier_down_degrades(
