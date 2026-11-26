@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -26,14 +27,18 @@ def _unauthorized() -> HTTPException:
     )
 
 
-async def get_user_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> UserRepository:
+async def get_user_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> UserRepository:
     return SqlUserRepository(session)
 
 
 UserRepo = Annotated[UserRepository, Depends(get_user_repo)]
 
 
-async def get_venue_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> VenueRepository:
+async def get_venue_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> VenueRepository:
     return SqlVenueRepository(session)
 
 
@@ -41,33 +46,46 @@ VenueRepo = Annotated[VenueRepository, Depends(get_venue_repo)]
 
 
 async def require_user(
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)], repo: UserRepo
+    creds: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_bearer),
+    ],
+    repo: UserRepo,
 ) -> User:
     if creds is None:
         raise _unauthorized()
+
     try:
         claims = decode_token(creds.credentials)
     except TokenError:
         raise _unauthorized() from None
+
     user = await repo.get_by_id(int(claims["sub"]))
+
     if user is None or not user.is_active:
         raise _unauthorized()
+
     return user
 
 
-async def require_admin(user: Annotated[User, Depends(require_user)]) -> User:
+async def require_admin(
+    user: Annotated[User, Depends(require_user)],
+) -> User:
     if user.role != Role.ADMIN:
         raise HTTPException(
             status_code=403,
             detail={"code": "FORBIDDEN", "message": "권한이 없습니다"},
         )
+
     return user
 
 
 CurrentUser = Annotated[User, Depends(require_user)]
 
 
-async def get_match_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> MatchRepository:
+async def get_match_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> MatchRepository:
     return SqlMatchRepository(session)
 
 
@@ -92,7 +110,9 @@ async def get_recommend_repo(
 RecommendRepo = Annotated[RecommendRepository, Depends(get_recommend_repo)]
 
 
-async def get_team_repo(session: Annotated[AsyncSession, Depends(get_session)]) -> TeamRepository:
+async def get_team_repo(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TeamRepository:
     return SqlTeamRepository(session)
 
 
@@ -106,3 +126,22 @@ async def get_review_repo(
 
 
 ReviewRepo = Annotated[ReviewRepository, Depends(get_review_repo)]
+
+
+def require_roles(*roles: Role) -> Callable:
+    async def role_checker(user: CurrentUser) -> User:
+        if user.role not in roles:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "FORBIDDEN",
+                    "message": "해당 기능에 접근할 권한이 없습니다",
+                },
+            )
+
+        return user
+
+    return role_checker
+
+
+AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
