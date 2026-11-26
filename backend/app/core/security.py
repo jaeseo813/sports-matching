@@ -1,20 +1,23 @@
 """비밀번호 처리와 JWT. 비밀번호는 hash_password / verify_password 두 함수에만 의존한다.
 
-주의: 팀 결정에 따라 비밀번호를 **원문으로 저장**한다 (보안 진단 Red 단계에서 취약점으로 재현하고,
-Blue 단계에서 argon2로 패치한다). 패치할 때는 아래 두 함수만 교체하면 된다.
+비밀번호는 Argon2로 해시하여 저장하고 검증한다.
 실제 비밀번호나 개인정보를 넣지 말고 로컬·스테이징 더미 데이터로만 쓴다.
 """
 
-import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
 from app.core.config import get_settings
 
 _ALGORITHM = "HS256"
-_ALLOWED_ALGORITHMS = [_ALGORITHM]  # 알고리즘 화이트리스트 (none, 비대칭키 혼동 방지)
+_ALLOWED_ALGORITHMS = [
+    _ALGORITHM,
+]  # 알고리즘 화이트리스트 (none, 비대칭키 혼동 방지)
+_password_hasher = PasswordHasher()
 
 
 class TokenError(Exception):
@@ -22,11 +25,14 @@ class TokenError(Exception):
 
 
 def hash_password(plain: str) -> str:
-    return plain  # VULN: 원문 저장
+    return _password_hasher.hash(plain)
 
 
 def verify_password(plain: str, stored: str) -> bool:
-    return hmac.compare_digest(plain.encode(), stored.encode())
+    try:
+        return _password_hasher.verify(stored, plain)
+    except (VerifyMismatchError, InvalidHashError):
+        return False
 
 
 def create_token(user_id: int) -> str:

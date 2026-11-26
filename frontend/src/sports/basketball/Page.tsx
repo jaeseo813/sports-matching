@@ -1,16 +1,21 @@
-
 import MatchList from "../../components/MatchList";
+import { SportChat } from "../../components/ChatPanel";
 import { useSportRules } from "../../lib/sports";
 import { basketball } from ".";
-import { faq, formats, positions } from "./data";
+import { formats, positions } from "./data";
 
 // 농구 담당 영역: 이 폴더(src/sports/basketball) 안에서만 작업한다.
 export default function Page() {
   const sports = useSportRules();
-
   const basketballRules = sports?.find(
-    (sport) => sport.id === "basketball"
+    (sport) => sport.id === basketball.id,
   );
+
+  const tiers = basketballRules
+    ? Object.entries(basketballRules.tier_labels).sort(
+        ([a], [b]) => Number(a) - Number(b),
+      )
+    : [];
 
   return (
     <div className="space-y-10">
@@ -39,7 +44,7 @@ export default function Page() {
           {formats.map((format) => (
             <article
               key={format.name}
-              className="rounded-xl border border-border p-5"
+              className="rounded-xl border border-edge bg-white p-5"
             >
               <h3 className="text-lg font-bold">{format.name}</h3>
               <p className="mt-1 text-sm text-muted">
@@ -66,10 +71,10 @@ export default function Page() {
           {positions.map((position) => (
             <article
               key={position.code}
-              className="rounded-xl border border-border p-5"
+              className="rounded-xl border border-edge bg-white p-5"
             >
               <div className="flex items-center gap-2">
-                <span className="rounded-lg bg-muted px-3 py-1 font-black">
+                <span className="rounded-lg bg-lime px-3 py-1 font-black">
                   {position.code}
                 </span>
                 <h3 className="font-bold">{position.name}</h3>
@@ -80,42 +85,44 @@ export default function Page() {
               </p>
 
               <p className="mt-2 text-xs text-muted">
-                {position.famousPlayer}
+                 유명한 선수: {position.players.join(", ")}
               </p>
             </article>
           ))}
         </div>
       </section>
 
-      {/* 티어 */}
-      <section aria-labelledby="tiers">
-        <h2 id="tiers" className="mb-3 text-xl font-extrabold">
-          농구 실력 티어
-        </h2>
+      {/* 티어 및 챗봇 */}
+      <div className="grid gap-10 md:grid-cols-2">
+        <section aria-labelledby="tiers">
+          <h2 id="tiers" className="mb-3 text-xl font-extrabold">
+            농구 실력 티어
+          </h2>
 
-        {!basketballRules ? (
-          <p className="text-sm text-muted">
-            티어 정보를 불러오는 중이거나 불러오지 못했습니다.
-          </p>
-        ) : (
-          <ol className="space-y-2">
-            {Object.entries(basketballRules.tier_labels)
-              .sort(([a], [b]) => Number(a) - Number(b))
-              .map(([tier, label]) => (
+          {!basketballRules ? (
+            <p className="text-sm text-muted">
+              티어 정보를 불러오는 중이거나 불러오지 못했습니다.
+            </p>
+          ) : (
+            <ol className="space-y-2">
+              {tiers.map(([tier, label]) => (
                 <li
                   key={tier}
-                  className="flex items-start gap-3 rounded-xl border border-border p-4"
+                  className="flex items-start gap-3 rounded-xl border border-edge bg-white p-4"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted font-black">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lime font-black">
                     {tier}
                   </span>
 
                   <span className="text-sm">{label}</span>
                 </li>
               ))}
-          </ol>
-        )}
-      </section>
+            </ol>
+          )}
+        </section>
+
+        <SportChat sport={basketball.id} />
+      </div>
 
       {/* 매치 목록 */}
       <section aria-labelledby="matches">
@@ -123,26 +130,7 @@ export default function Page() {
           모집 중인 농구 매치
         </h2>
 
-        <MatchList sport="basketball" />
-      </section>
-
-      {/* FAQ */}
-      <section aria-labelledby="faq">
-        <h2 id="faq" className="mb-3 text-xl font-extrabold">
-          자주 묻는 질문
-        </h2>
-
-        <div className="space-y-3">
-          {faq.map((item, index) => (
-            <article
-              key={index}
-              className="rounded-xl border border-border p-5"
-            >
-              <h3 className="font-bold">{item.q}</h3>
-              <p className="mt-2 text-sm text-muted">{item.a}</p>
-            </article>
-          ))}
-        </div>
+        <MatchList sport={basketball.id} />
       </section>
     </div>
   );

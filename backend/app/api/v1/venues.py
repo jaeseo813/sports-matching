@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
-from app.api.deps import CurrentUser, VenueRepo, require_admin
-from app.models.user import User
+from app.api.deps import AdminUser, CurrentUser, VenueRepo
 from app.schemas.venue import Lat, Lng, VenueCreateIn, VenueOut
 from app.services import venues as venue_service
 
@@ -25,12 +24,18 @@ async def nearby(
 
 
 @router.get("/{venue_id}", response_model=VenueOut)
-async def get_venue(venue_id: int, _: CurrentUser, repo: VenueRepo) -> VenueOut:
+async def get_venue(
+    venue_id: int,
+    _: CurrentUser,
+    repo: VenueRepo,
+) -> VenueOut:
     return await venue_service.get_venue(repo, venue_id)
 
 
 @router.post("", response_model=VenueOut, status_code=201)
 async def create_venue(
-    data: VenueCreateIn, admin: Annotated[User, Depends(require_admin)], repo: VenueRepo
+    data: VenueCreateIn,
+    admin: AdminUser,
+    repo: VenueRepo,
 ) -> VenueOut:
     return await venue_service.create_venue(repo, data, admin.id)
