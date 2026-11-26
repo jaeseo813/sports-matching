@@ -16,6 +16,7 @@ from app.repositories.review import ReviewRepository, SqlReviewRepository
 from app.repositories.team import SqlTeamRepository, TeamRepository
 from app.repositories.user import SqlUserRepository, UserRepository
 from app.repositories.venue import SqlVenueRepository, VenueRepository
+from collections.abc import Awaitable, Callable
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -128,7 +129,7 @@ async def get_review_repo(
 ReviewRepo = Annotated[ReviewRepository, Depends(get_review_repo)]
 
 
-def require_roles(*roles: Role) -> Callable:
+def require_roles(*roles: Role) -> Callable[..., Awaitable[User]]:
     async def role_checker(user: CurrentUser) -> User:
         if user.role not in roles:
             raise HTTPException(
