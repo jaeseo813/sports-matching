@@ -16,7 +16,6 @@ from app.repositories.review import ReviewRepository, SqlReviewRepository
 from app.repositories.team import SqlTeamRepository, TeamRepository
 from app.repositories.user import SqlUserRepository, UserRepository
 from app.repositories.venue import SqlVenueRepository, VenueRepository
-from collections.abc import Awaitable, Callable
 
 _bearer = HTTPBearer(auto_error=False)
 
