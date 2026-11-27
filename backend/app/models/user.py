@@ -40,6 +40,10 @@ class User(TimestampMixin, Base):
     # 선호 시간대 (dawn/morning/afternoon/evening). 비어 있으면 제약 없음
     preferred_slots: Mapped[list[str] | None] = mapped_column(JSON)
 
+    @property
+    def is_admin(self) -> bool:
+        return self.role is Role.ADMIN
+
 
 class UserLocation(TimestampMixin, Base):
     """활동 기준점. 사용자당 최대 2개 (slot 1, 2)."""

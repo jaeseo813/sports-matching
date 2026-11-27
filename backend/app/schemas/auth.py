@@ -28,9 +28,10 @@ class TokenOut(BaseModel):
 
 
 class UserOut(BaseModel):
-    """본인 정보 응답. 비밀번호·역할·내부 카운터는 싣지 않는다."""
+    """본인 정보 응답. 비밀번호·내부 카운터는 싣지 않는다."""
 
     id: int
     email: str
     nickname: str
     gender: Gender
+    is_admin: bool  # 화면에서 관리자 메뉴를 보일지 정한다. 실제 권한은 require_admin이 검사한다

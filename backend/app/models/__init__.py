@@ -2,6 +2,7 @@
 from app.models.base import Base
 from app.models.match import Match, Participation, TeamAssignment
 from app.models.matching_weight import MatchingWeight
+from app.models.notification import Notification
 from app.models.review import PeerReview
 from app.models.user import User, UserBlock, UserLocation, UserSkill
 from app.models.venue import Venue, VenueSport
@@ -10,6 +11,7 @@ __all__ = [
     "Base",
     "Match",
     "MatchingWeight",
+    "Notification",
     "Participation",
     "PeerReview",
     "TeamAssignment",

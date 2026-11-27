@@ -203,3 +203,11 @@ async def rate(
     match_id: int, user: CurrentUser, matches: MatchRepo, reviews: ReviewRepo
 ) -> RateOut:
     return await review_service.apply_ratings(matches, reviews, user, match_id)
+
+
+@router.put("/{match_id}/host-block", status_code=204)
+async def block_host(
+    match_id: int, user: CurrentUser, matches: MatchRepo, profiles: ProfileRepo
+) -> Response:
+    await match_service.block_host(matches, profiles, user, match_id)
+    return Response(status_code=204)

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { ApiError, api, post } from "../lib/api/client";
 import type { MatchOut, ParticipationOut } from "../lib/api/types";
@@ -33,9 +33,19 @@ function Applicants({ matchId, onChange }: { matchId: number; onChange: () => vo
       reload();
       onChange();
     } catch (e) {
-      setMsg(e instanceof ApiError ? e.message : "처리하지 못했어요");
+      setMsg(`⚠ ${e instanceof ApiError ? e.message : "처리하지 못했어요"}`);
     } finally {
       setBusy(null);
+    }
+  };
+
+  const block = async (userId: number, nickname: string) => {
+    if (!confirm(`${nickname}님을 차단할까요? 이 사람이 연 매치가 추천과 목록에서 사라져요.`)) return;
+    try {
+      await api(`/me/blocks/${userId}`, { method: "PUT" });
+      setMsg(`${nickname}님을 차단했어요. 내 정보에서 풀 수 있어요.`);
+    } catch (e) {
+      setMsg(`⚠ ${e instanceof ApiError ? e.message : "처리하지 못했어요"}`);
     }
   };
 
@@ -44,7 +54,7 @@ function Applicants({ matchId, onChange }: { matchId: number; onChange: () => vo
   return (
     <section aria-labelledby="applicants" className="rounded-xl border border-edge bg-white p-5">
       <h2 id="applicants" className="text-lg font-extrabold">참가자·신청자</h2>
-      {msg && <p role="alert" className="mt-2 text-sm font-semibold">⚠ {msg}</p>}
+      {msg && <p role="alert" className="mt-2 text-sm font-semibold">{msg}</p>}
       <ul className="mt-3 divide-y divide-edge">
         {others.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
@@ -56,6 +66,9 @@ function Applicants({ matchId, onChange }: { matchId: number; onChange: () => vo
                 </button>
                 <button type="button" disabled={busy === p.id} onClick={() => decide(p.id, false)} className="flex min-h-11 items-center gap-1 rounded-lg border border-edge px-4 font-bold disabled:opacity-50">
                   <X size={16} aria-hidden="true" /> 거절
+                </button>
+                <button type="button" onClick={() => void block(p.user_id, p.nickname)} className="min-h-11 rounded-lg border border-edge px-4 font-bold">
+                  차단
                 </button>
               </span>
             ) : (
@@ -70,6 +83,7 @@ function Applicants({ matchId, onChange }: { matchId: number; onChange: () => vo
 
 export default function MatchDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { data: m, error, reload } = useApi<MatchOut>(`/matches/${Number(id)}`);
   const rules = useSportRules();
   const [busy, setBusy] = useState(false);
@@ -141,7 +155,25 @@ export default function MatchDetail() {
             ))}
           </Row>
           <Row label="성별">{genderPolicyLabel[m.gender_policy]}</Row>
-          <Row label="주최자">{m.host_nickname}</Row>
+          <Row label="주최자">
+            {m.host_nickname}
+            {!m.is_host && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  confirm(`${m.host_nickname}님을 차단할까요? 이 사람이 연 매치가 추천과 목록에서 사라져요.`) &&
+                  act(async () => {
+                    await api(`/matches/${m.id}/host-block`, { method: "PUT" });
+                    navigate("/matches");
+                  })
+                }
+                className="ml-3 min-h-11 rounded-lg border border-edge px-3 text-xs font-bold disabled:opacity-50"
+              >
+                차단
+              </button>
+            )}
+          </Row>
         </dl>
         {m.description && <p className="mt-4 whitespace-pre-line rounded-lg bg-cream p-3 text-sm">{m.description}</p>}
 

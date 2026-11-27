@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { LocationOut, SkillOut } from "../lib/api/types";
+import { api } from "../lib/api/client";
+import type { BlockOut, LocationOut, SkillOut } from "../lib/api/types";
 import { useAuth } from "../lib/auth";
 import { trendLabel } from "../lib/labels";
 import { useSportRules } from "../lib/sports";
@@ -13,7 +15,19 @@ export default function MyPage() {
   const rules = useSportRules();
   const skills = useApi<SkillOut[]>("/me/skills");
   const locations = useApi<LocationOut[]>("/me/locations");
+  const blocks = useApi<BlockOut[]>("/me/blocks");
+  const [blockError, setBlockError] = useState(false);
   if (!user) return null;
+
+  const unblock = async (id: number) => {
+    setBlockError(false);
+    try {
+      await api(`/me/blocks/${id}`, { method: "DELETE" });
+      blocks.reload();
+    } catch {
+      setBlockError(true);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -67,6 +81,29 @@ export default function MyPage() {
           ))}
         </ul>
       </section>
+
+      <section aria-labelledby="blocks" className="rounded-xl border border-edge bg-white p-5">
+        <h2 id="blocks" className="text-lg font-extrabold">차단한 사람</h2>
+        <p className="mt-1 text-xs text-muted">차단한 사람이 연 매치는 추천과 목록에 나오지 않아요.</p>
+        {blocks.data && blocks.data.length === 0 && <p className="mt-2 text-sm text-muted">차단한 사람이 없어요.</p>}
+        {blockError && <p role="alert" className="mt-2 text-sm font-semibold">⚠ 차단을 풀지 못했어요</p>}
+        <ul className="mt-2 divide-y divide-edge">
+          {blocks.data?.map((b) => (
+            <li key={b.user_id} className="flex items-center justify-between py-2 text-sm">
+              <span className="font-bold">{b.nickname}</span>
+              <button type="button" onClick={() => void unblock(b.user_id)} className="min-h-11 rounded-lg border border-edge px-4 font-bold">
+                차단 해제
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {user.is_admin && (
+        <Link to="/venues/new" className="flex min-h-12 items-center justify-center rounded-lg bg-night font-bold text-lime">
+          구장 등록 (관리자)
+        </Link>
+      )}
 
       <button
         type="button"

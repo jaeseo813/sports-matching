@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { CalendarDays, LayoutDashboard, User } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { ChatButton } from "./ChatPanel";
+import NotificationBell from "./NotificationBell";
 
 const tabs = [
   { to: "/dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -39,6 +40,7 @@ export default function AppLayout() {
           {!loading &&
             (user ? (
               <div className="flex items-center gap-3 text-sm">
+                <NotificationBell key={user.id} />
                 <span className="hidden font-bold sm:inline">{user.nickname}</span>
                 <button type="button" onClick={() => void logout()} className="min-h-11 rounded-lg border border-edge px-4 font-bold hover:bg-edge">
                   로그아웃

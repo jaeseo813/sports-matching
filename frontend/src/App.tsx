@@ -11,6 +11,7 @@ import MyPage from "./pages/MyPage";
 import Onboarding from "./pages/Onboarding";
 import Signup from "./pages/Signup";
 import SportRoute from "./pages/SportRoute";
+import VenueNew from "./pages/VenueNew";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="matches/:id" element={<MatchDetail />} />
           <Route path="sports/:sportId" element={<SportRoute />} />
           <Route path="me" element={<MyPage />} />
+          <Route path="venues/new" element={<VenueNew />} />
         </Route>
       </Route>
     </Routes>

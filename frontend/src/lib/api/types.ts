@@ -96,3 +96,20 @@ export interface RateOut {
   applied: boolean;
   updated: number;
 }
+
+export interface NotificationsOut {
+  unread: number;
+  items: {
+    id: number;
+    kind: "accepted" | "confirmed";
+    match_id: number;
+    match_title: string;
+    read: boolean;
+    created_at: string; // ISO, UTC
+  }[];
+}
+
+export interface BlockOut {
+  user_id: number;
+  nickname: string;
+}
