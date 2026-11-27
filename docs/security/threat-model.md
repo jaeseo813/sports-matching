@@ -26,5 +26,5 @@
 - 레이트리밋은 서버 메모리라 재시작하면 초기화된다.
 - `GET /metrics`는 `METRICS_TOKEN`(Bearer)으로 보호한다. 토큰을 비우면 `ENV=local`에서만 인증 없이 열린다. 레이트리밋은 없다([README](README.md) B 절).
 
-## 의도적 취약점 (학습용, `main`에 남겨 둠)
-- **비밀번호 원문 저장**: `core/security.py`의 `hash_password`/`verify_password`. 교체할 때는 이 두 함수만 바꾼다.
+## 의도적 취약점 (해소됨)
+- ~~비밀번호 원문 저장~~ → Argon2로 교체(#39). 그전에 원문으로 저장된 계정은 마이그레이션 `c3d4e5f6a7b8`이 해시로 바꾼다.
