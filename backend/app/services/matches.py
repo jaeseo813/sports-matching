@@ -253,6 +253,7 @@ async def apply(
             created.position = position
         except DuplicateParticipationError:
             raise _error(409, "ALREADY_APPLIED", "이미 신청한 매치입니다") from None
+    matches.add_notification(match.host_id, match.id, NotificationKind.APPLIED)
     await matches.commit()
     return ParticipationStatus.APPLIED
 
@@ -290,6 +291,7 @@ async def decide(
         raise _error(409, "ALREADY_DECIDED", "이미 처리된 신청입니다")
     if not accept:
         part.status = ParticipationStatus.REJECTED
+        matches.add_notification(part.user_id, match.id, NotificationKind.REJECTED)
         await matches.commit()
         return part.status
     if match.status not in (MatchStatus.OPEN, MatchStatus.FULL):
@@ -352,6 +354,11 @@ async def confirm_match(matches: MatchRepository, host: User, match_id: int) -> 
 async def cancel_match(matches: MatchRepository, host: User, match_id: int) -> MatchStatus:
     match = await _transition(matches, host, match_id, MatchStatus.CANCELED)
     match.status = MatchStatus.CANCELED
+    # 참가가 정해진 사람과 아직 답을 기다리는 신청자 모두에게 알린다 (주최자 본인 제외)
+    waiting = (ParticipationStatus.APPLIED, ParticipationStatus.ACCEPTED)
+    for part, _ in await matches.list_participations(match_id):
+        if part.status in waiting and part.user_id != host.id:
+            matches.add_notification(part.user_id, match_id, NotificationKind.CANCELED)
     await matches.commit()
     return match.status
 

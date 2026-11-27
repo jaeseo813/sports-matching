@@ -38,8 +38,11 @@ class ParticipationStatus(StrEnum):
 
 
 class NotificationKind(StrEnum):
+    APPLIED = "applied"  # (주최자에게) 내 매치에 새 신청이 들어옴
     ACCEPTED = "accepted"  # 내 신청이 수락됨
+    REJECTED = "rejected"  # 내 신청이 거절됨
     CONFIRMED = "confirmed"  # 참가하는 매치가 확정됨
+    CANCELED = "canceled"  # 참가하거나 신청한 매치를 주최자가 취소함
 
 
 class Verdict(StrEnum):
