@@ -1,7 +1,7 @@
 """앱 안 알림(매칭 수락·확정) 테이블
 
 Revision ID: b605b4e8b087
-Revises: b7c1e2f3a4d5
+Revises: c3d4e5f6a7b8
 Create Date: 2026-11-25 17:47:30
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b605b4e8b087"
-down_revision: str | Sequence[str] | None = "b7c1e2f3a4d5"
+down_revision: str | Sequence[str] | None = "c3d4e5f6a7b8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
