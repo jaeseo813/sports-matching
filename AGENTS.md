@@ -12,7 +12,7 @@
 
 ## 2. 기술 스택
 - 백엔드: Python 3.12, FastAPI(async), MariaDB 11(공간 기능), SQLAlchemy 2.0 async(`asyncmy`) + Alembic, Pydantic v2
-- 인증: JWT access 토큰 하나(24시간, refresh·서버 세션 없음). 비밀번호는 현재 원문 저장(5절). Redis 없음(레이트리밋은 인메모리)
+- 인증: JWT access 토큰 하나(24시간, refresh·서버 세션 없음). 비밀번호는 Argon2 해시. Redis 없음(레이트리밋은 인메모리)
 - 프론트(가정): React 19 + Vite + TS, TanStack Query, Zustand, Tailwind + shadcn/ui, Kakao Maps, react-hook-form + zod
 - 챗봇: DeepSeek API(OpenAI 호환, `openai` 패키지의 `AsyncOpenAI` + `base_url`), 모델 `deepseek-flash`, SSE 스트리밍, tool calls. 키·주소·모델은 `Settings`(`deepseek_*`)에서만 읽는다
 - 보안 도구: bandit, ruff(S), pip-audit, gitleaks (웹 스캐너 ZAP·Burp는 범위 밖)
@@ -69,7 +69,7 @@ Venue, Match(status: open→full→confirmed→completed/canceled, 경기 중 �
 - 모든 엔드포인트에 인가 의존성(`Depends(require_*)`) + **객체 소유권 검사**. 없으면 머지 불가
 - 응답은 Pydantic 화이트리스트 스키마만, ORM 객체·`dict` 직접 반환 금지
 - 입력 검증은 Pydantic에서(길이·범위·enum), 좌표는 lat 33~39 / lng 124~132
-- 인증: JWT access 하나, 알고리즘 화이트리스트, 로그아웃은 클라이언트가 토큰 삭제. 비밀번호 처리는 `core/security.py`의 `hash_password`/`verify_password`에만 둔다(현재 원문 저장 — 의도적 취약점, `docs/security/threat-model.md`에 기록)
+- 인증: JWT access 하나, 알고리즘 화이트리스트, 로그아웃은 클라이언트가 토큰 삭제. 비밀번호 처리는 `core/security.py`의 `hash_password`/`verify_password`에만 둔다(Argon2. 이전에 원문으로 저장된 계정은 마이그레이션으로 해시했다)
 - 레이트리밋(인메모리): 로그인 5/분, 매치 신청 10/분, 챗봇 20/5분
 - 정원 초과 레이스는 `SELECT ... FOR UPDATE` / 유니크 제약으로 방지, 스코어링·레이팅은 서버에서만 계산
 - 에러는 `{"detail": {"code": "MATCH_FULL", "message": "..."}}` 형태, 스택트레이스/SQL 노출 금지
