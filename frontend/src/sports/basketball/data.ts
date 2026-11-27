@@ -1,53 +1,10 @@
+// 농구 종목 데이터. 팀 인원과 티어 설명은 서버(GET /sports, useSportRules)에서 받고,
+// 여기에는 서버에 없는 화면 문구만 둔다.
 
-export const formats = [
-  {
-    name: "3대3",
-    team: "3명씩",
-    total: 6,
-    note: "하프코트에서 진행하는 경기예요. 빠른 공격과 개인 기술이 중요해요.",
-  },
-  {
-    name: "5대5",
-    team: "5명씩",
-    total: 10,
-    note: "풀코트에서 진행하는 일반적인 농구 경기예요. 팀워크와 포지션 밸런스가 중요해요.",
-  },
-];
+// 인원 구성 카드의 보충 설명 (키: 팀당 인원). 서버에 새 인원이 생기면 설명 없이 표시된다.
+export const formatNotes: Record<number, string> = {
+  3: "하프코트 하나로 해요. 공격 전환이 빠르고 개인 기술을 쓸 일이 많아요.",
+  5: "풀코트에서 해요. 포지션을 나눠 맡고 팀워크가 중요해요.",
+};
 
-
-
-
-
-// 농구 포지션
-export const positions = [
-  {
-    code: "PG",
-    name: "포인트 가드",
-    description: "경기를 운영하고 패스로 공격 기회를 만들어요.",
-    players: ["스테판 커리", "크리스 폴", "허훈"],
-  },
-  {
-    code: "SG",
-    name: "슈팅 가드",
-    description: "외곽 슈팅과 득점에 강점을 가진 포지션이에요.",
-    players: ["코비 브라이언트", "제임스 하든", "유기상"],
-  },
-  {
-    code: "SF",
-    name: "스몰 포워드",
-    description: "공격과 수비 모두에서 균형 잡힌 역할을 해요.",
-    players: ["르브론 제임스", "케빈 듀란트", "이현중"],
-  },
-  {
-    code: "PF",
-    name: "파워 포워드",
-    description: "리바운드와 골밑 공격에 적극적으로 참여해요.",
-    players: ["팀 던컨", "앤서니 데이비스", "김종규"],
-  },
-  {
-    code: "C",
-    name: "센터",
-    description: "골밑 수비와 리바운드, 블록을 담당해요.",
-    players: ["샤킬 오닐", "조엘 엠비드", "디안드레 조던"],
-  },
-];
+// 규칙 FAQ는 서버(backend/app/sports/basketball/faq.py)에 있다. 질문은 GET /sports로 받아 챗봇 추천 질문으로 쓰고, 답은 챗봇이 같은 faq.py로 한다.
