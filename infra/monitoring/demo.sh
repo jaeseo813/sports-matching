@@ -108,6 +108,7 @@ run() {
   for _ in 1 2 3; do printf " %s" "$(too_long_chat "$token")"; done
   echo
   echo "대시보드: $GRAFANA/d/teamup-security  경보: http://127.0.0.1:9090/alerts"
+  echo "DISCORD_WEBHOOK_URL을 넣었다면 20초 안에 디스코드에 경보 3개가 옵니다."
 }
 
 case "${1:-run}" in

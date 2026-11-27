@@ -1,20 +1,35 @@
 # 보안 경보 규칙. 임계값은 데모용 기본값이다. 바꾸면 docs/security/README.md B 절도 고친다.
-# 확인: http://127.0.0.1:9090/alerts
+# 확인: http://127.0.0.1:9090/alerts . 울리면 Alertmanager가 디스코드로 보낸다(alertmanager/alertmanager.yml).
+# summary는 메시지 첫 줄, description은 지금 값이다.
+# 횟수는 1분 동안의 최댓값 - 최솟값으로 센다. increase()는 구간 끝을 추정으로 늘려서
+# 403 12번이 "18회"로 찍히므로 경보(메시지에 숫자가 나간다)에는 쓰지 않는다. 대시보드 그래프는 increase()다.
 groups:
   - name: teamup-security
     rules:
       - alert: LoginFailureBurst
-        expr: sum(increase(teamup_security_events_total{event="unauthorized",code="INVALID_CREDENTIALS"}[1m])) >= 5
+        expr: sum(max_over_time(teamup_security_events_total{event="unauthorized",code="INVALID_CREDENTIALS"}[1m]) - min_over_time(teamup_security_events_total{event="unauthorized",code="INVALID_CREDENTIALS"}[1m])) >= 5
         for: 0m
         labels:
           severity: warning
         annotations:
           summary: "1분 안에 로그인 실패 5회 이상 (비밀번호 대입 의심)"
+          description: '최근 1분 로그인 실패 {{ printf "%.0f" $value }}회'
 
       - alert: ForbiddenBurst
-        expr: sum(increase(teamup_security_events_total{event="forbidden"}[1m])) >= 10
+        expr: sum(max_over_time(teamup_security_events_total{event="forbidden"}[1m]) - min_over_time(teamup_security_events_total{event="forbidden"}[1m])) >= 10
         for: 0m
         labels:
           severity: warning
         annotations:
           summary: "1분 안에 403 10회 이상 (남의 매치·자원 접근 시도 의심)"
+          description: '최근 1분 403 {{ printf "%.0f" $value }}회'
+
+      # 공격성 차단만 센다: 마스킹(PII_*), 가드 장애(GUARD_UNAVAILABLE), 이력 위조(FORGED_HISTORY)는 뺀다(차단율 패널과 같은 기준).
+      - alert: ChatGuardBlockBurst
+        expr: sum(max_over_time(teamup_security_events_total{event="chat_input_blocked",code!~"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY"}[1m]) - min_over_time(teamup_security_events_total{event="chat_input_blocked",code!~"PII_.*|GUARD_UNAVAILABLE|FORGED_HISTORY"}[1m])) >= 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "1분 안에 챗봇 입력 가드 차단 3회 이상 (인젝션·탈옥 시도 의심)"
+          description: '최근 1분 입력 가드 차단 {{ printf "%.0f" $value }}회'

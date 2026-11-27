@@ -51,7 +51,7 @@
 **목표**: 보안 이벤트를 한눈에 보는 대시보드. 발표 라이브 데모(공격 → 그래프에 바로 뜸)에 쓴다.
 
 **지금 있는 것**
-- `docker-compose.yml`의 `monitoring` 프로필에 Prometheus(`127.0.0.1:9090`)·Grafana(`127.0.0.1:3000`). 설정은 `infra/monitoring/`.
+- `docker-compose.yml`의 `monitoring` 프로필에 Prometheus(`127.0.0.1:9090`)·Grafana(`127.0.0.1:3000`)·Alertmanager(`127.0.0.1:9093`, 경보를 디스코드로 보낸다). 설정은 `infra/monitoring/`.
 - Prometheus는 5초마다 `host.docker.internal:8000/metrics`(로컬 uvicorn)를 수집한다(job `teamup-api`). Grafana 데이터소스 uid는 `teamup-prometheus`.
 
 **실행**
@@ -68,7 +68,7 @@ docker compose --profile monitoring up -d
 - 수집 확인: http://127.0.0.1:9090/targets 에서 `teamup-api`가 `UP`. API가 꺼져 있으면 `DOWN`이고, 대시보드는 "API 수집 상태"가 빨간 "수집 중단", 나머지 패널은 비거나 "데이터 없음"이 된다.
 - **Linux(Docker Desktop이 아닌 Docker Engine)**: 컨테이너가 호스트의 `127.0.0.1`에 닿지 않아 계속 `DOWN`이다. uvicorn을 docker 브리지 주소로 띄운다: `uv run uvicorn app.main:app --reload --host 172.17.0.1` (`ip addr show docker0`로 주소 확인). `0.0.0.0`은 API와 `/metrics`가 같은 네트워크에 열리므로 쓰지 않는다. macOS·Windows(WSL2 포함) Docker Desktop은 그대로 된다.
 - 3000번(또는 9090번) 포트를 이미 쓰고 있으면 `docker-compose.yml`에서 **왼쪽 포트만** 바꾼다(예: `127.0.0.1:3001:3000`).
-- 끄기: `docker compose stop prometheus grafana` (`--profile monitoring down`은 DB까지 멈춘다)
+- 끄기: `docker compose stop prometheus grafana alertmanager` (`--profile monitoring down`은 DB까지 멈춘다)
 
 - 대시보드 **TeamUp 보안 이벤트** (http://127.0.0.1:3000/d/teamup-security, `infra/monitoring/grafana/dashboards/security.json`): 15분 범위, 5초 새로고침.
 
@@ -85,8 +85,10 @@ docker compose --profile monitoring up -d
 
   패널은 모두 `increase()`로 증가량만 그린다(uvicorn `--reload`로 카운터가 0이 돼도 그래프가 꺾이지 않게).
   대시보드는 파일로만 관리한다(화면에서 저장 불가). 고치려면 화면에서 수정 → JSON 내보내기 → 이 파일에 커밋, 데이터소스 uid는 `teamup-prometheus` 유지.
-- 경보 규칙 (`infra/monitoring/prometheus/alerts.yml`, 확인은 http://127.0.0.1:9090/alerts): 1분 안에 로그인 실패 5회 이상 `LoginFailureBurst`, 403 10회 이상 `ForbiddenBurst`. 알림 채널(메일·슬랙)은 없다.
+- 경보 규칙 (`infra/monitoring/prometheus/alerts.yml`, 확인은 http://127.0.0.1:9090/alerts): 1분 안에 로그인 실패 5회 이상 `LoginFailureBurst`, 403 10회 이상 `ForbiddenBurst`, 챗봇 입력 가드 차단 3회 이상 `ChatGuardBlockBurst`(차단율 패널처럼 `PII_*`·`GUARD_UNAVAILABLE`·`FORGED_HISTORY`는 뺀다). 울리면 디스코드로 간다(아래 "디스코드 알림").
+  횟수는 1분 동안의 **최댓값 − 최솟값**으로 센다. `increase()`는 구간 끝을 추정으로 늘려 403 12번을 "18회"로 계산하는데, 경보는 숫자가 메시지로 나가므로 정확한 값을 쓴다. 대시보드 그래프는 그대로 `increase()`다.
   로그인은 IP당 1분 5회 제한이라 한 IP에서는 로그인 실패가 1분에 5회까지만 쌓인다(그 뒤는 `rate_limited`).
+- 테스트 `tests/security/test_alerting.py`: 웹훅 주소가 레포에 없는지, Prometheus → Alertmanager → 디스코드 연결, 규칙마다 메시지 문구(`summary`·`description`)가 있는지, 경보가 정확한 횟수로 세는지 검사한다.
 - 테스트 `tests/security/test_security_dashboard.py`: 대시보드가 쓰는 `event` 값이 `SecurityEvent` Literal에 있는지, 카운터를 `increase`/`rate`로만 쓰는지, PromQL 괄호 짝, 경보 규칙의 이벤트 이름 등을 검사한다. **Literal의 이벤트 이름을 바꾸면 이 테스트가 실패하니 대시보드와 경보 규칙(`alerts.yml`, 같은 테스트가 검사)도 같이 고친다.**
 
 **라이브 데모** (`infra/monitoring/demo.sh`, 시드 데이터 필요: `cd backend && uv run python -m scripts.seed_dev`)
@@ -95,8 +97,18 @@ docker compose --profile monitoring up -d
    - 로그인 한도(1분 5회)를 본 실행에 남겨 두려고 시드 계정 토큰을 미리 받아 둔다.
 2. 1분 뒤, 발표 중: 대시보드를 띄워 두고 `bash infra/monitoring/demo.sh`.
    ① 토큰 없이 `/auth/me` 10회 → 401 ② 틀린 비밀번호 로그인 7회 → 401 ×5, 429 ×2 ③ 남이 연 매치 취소 12회 → 403 ④ 챗봇에 600자 입력 3회 → 입력 가드 `TOO_LONG` 차단(규칙만으로 막혀 DeepSeek를 부르지 않는다. 서버에 `DEEPSEEK_API_KEY`가 없으면 503으로 끝나고 차단율은 비어 있다).
-   10초쯤 뒤 패널이 올라가고 `LoginFailureBurst`·`ForbiddenBurst` 경보가 울린다.
+   10초쯤 뒤 패널이 올라가고 경보 3개(`LoginFailureBurst`·`ForbiddenBurst`·`ChatGuardBlockBurst`)가 울려 20초 안에 디스코드에 메시지가 온다. 1분쯤 뒤 "✅ 경보 해제"가 온다.
+   다시 보여 주려면 해제 메시지가 온 뒤에 실행한다(울리는 중에는 같은 경보를 1시간 동안 다시 보내지 않는다).
 3. API를 재시작했다면 1부터 다시 한다.
+
+**디스코드 알림**
+- 경보가 울리면 Prometheus → Alertmanager → 디스코드 채널로 메시지가 간다. 설정은 `infra/monitoring/alertmanager/alertmanager.yml`.
+- 켜는 법: 디스코드 채널 설정 → 연동 → 웹후크 → 새 웹후크 → URL 복사 → `.env`에 `DISCORD_WEBHOOK_URL=<복사한 주소>` → `docker compose --profile monitoring up -d --force-recreate alertmanager`.
+- **웹훅 주소는 비밀값이다.** 주소를 아는 사람은 누구나 그 채널에 글을 쓸 수 있다. `.env`에만 두고 레포·채팅에 올리지 않는다(새어 나가면 디스코드에서 웹후크를 지우고 새로 만든다). compose가 시작할 때 컨테이너 안 파일(`/alertmanager/discord_webhook`)로 쓰므로 설정 파일에는 없지만, 컨테이너 환경변수라 `docker inspect`로는 보인다(로컬 개발용 수준).
+- 비워 두면 `alertmanager-off.yml`로 떠서 아무 데도 보내지 않는다(경보는 9090·9093 화면에서만 보인다).
+- 메시지: 제목 `🚨 보안 경보: <경보 이름>`, 본문은 무슨 일인지(`summary`), 최근 1분 횟수, 시각(KST), 대시보드 주소. 해제되면 `✅ 경보 해제`가 온다.
+  대시보드 주소는 `127.0.0.1`이라 **모니터링을 띄운 컴퓨터에서만 열린다**. 그래서 메시지 본문만 읽어도 무슨 일인지 알 수 있게 횟수를 넣었다.
+- 같은 경보는 1분 단위로 묶어 보내고, 계속 울리면 1시간마다 한 번만 다시 보낸다(채널 도배 방지).
 
 **/metrics 보호 (토큰)**
 - 방식: `.env`의 `METRICS_TOKEN`. API는 `Authorization: Bearer <값>`이 맞을 때만 지표를 준다(비교는 `secrets.compare_digest`). 틀리면 401 `METRICS_UNAUTHORIZED`이고 보안 이벤트(`unauthorized`, route `/metrics`)로도 남는다.

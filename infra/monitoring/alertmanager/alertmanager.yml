@@ -1,0 +1,23 @@
+# 보안 경보를 디스코드 채널로 보낸다 (파트 B).
+# 웹훅 주소는 레포에 두지 않는다: compose가 .env의 DISCORD_WEBHOOK_URL을 시작 때 아래 파일로 쓴다.
+# DISCORD_WEBHOOK_URL이 비어 있으면 compose가 alertmanager-off.yml로 띄운다(경보는 Prometheus 화면에만).
+# 확인: http://127.0.0.1:9093
+route:
+  receiver: discord
+  group_by: [alertname]
+  group_wait: 5s          # 데모에서 빨리 오도록 짧게
+  group_interval: 1m
+  repeat_interval: 1h     # 계속 울리는 경보는 1시간마다 한 번만 다시 보낸다
+
+receivers:
+  - name: discord
+    discord_configs:
+      - webhook_url_file: /alertmanager/discord_webhook
+        send_resolved: true
+        title: >-
+          {{ if eq .Status "firing" }}🚨 보안 경보{{ else }}✅ 경보 해제{{ end }}: {{ .CommonLabels.alertname }}
+        message: |-
+          {{ range .Alerts }}{{ .Annotations.summary }}
+          {{ if eq $.Status "firing" }}{{ .Annotations.description }}
+          {{ end }}시각: {{ (.StartsAt | tz "Asia/Seoul").Format "2006-01-02 15:04:05" }} (KST)
+          {{ end }}대시보드: http://127.0.0.1:3000/d/teamup-security (모니터링을 띄운 컴퓨터에서만 열림)

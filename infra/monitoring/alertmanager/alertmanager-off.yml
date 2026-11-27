@@ -1,0 +1,7 @@
+# DISCORD_WEBHOOK_URL이 없을 때 쓰는 설정: 경보를 받기만 하고 아무 데도 보내지 않는다.
+# 경보는 http://127.0.0.1:9090/alerts 와 http://127.0.0.1:9093 에서 볼 수 있다.
+route:
+  receiver: none
+
+receivers:
+  - name: none
