@@ -1,4 +1,4 @@
-// 매칭 알림: 신청 수락·매치 확정. 30초마다 새로 확인하고, 열면 읽음으로 바꾼다
+// 매칭 알림: 새 신청(주최자), 수락·거절, 매치 확정·취소. 30초마다 새로 확인하고, 열면 읽음으로 바꾼다
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
@@ -7,7 +7,13 @@ import type { NotificationsOut } from "../lib/api/types";
 import { formatWhen } from "../lib/format";
 import { useApi } from "../lib/useApi";
 
-const text = { accepted: "신청이 수락됐어요", confirmed: "매치가 확정됐어요" } as const;
+const text = {
+  applied: "내 매치에 새 신청이 들어왔어요",
+  accepted: "신청이 수락됐어요",
+  rejected: "신청이 거절됐어요",
+  confirmed: "매치가 확정됐어요",
+  canceled: "매치가 취소됐어요",
+} as const;
 
 export default function NotificationBell() {
   const { data, error, reload } = useApi<NotificationsOut>("/me/notifications");

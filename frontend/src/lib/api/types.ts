@@ -101,7 +101,7 @@ export interface NotificationsOut {
   unread: number;
   items: {
     id: number;
-    kind: "accepted" | "confirmed";
+    kind: "applied" | "accepted" | "rejected" | "confirmed" | "canceled";
     match_id: number;
     match_title: string;
     read: boolean;
