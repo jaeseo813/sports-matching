@@ -44,6 +44,25 @@ services:
       - ./infra/monitoring/prometheus:/etc/prometheus:ro
     extra_hosts: ["host.docker.internal:host-gateway"]  # 호스트의 uvicorn(8000)을 수집
     ports: ["127.0.0.1:9090:9090"]
+    depends_on: [alertmanager]
+
+  alertmanager:
+    profiles: ["monitoring"]
+    image: prom/alertmanager:v0.34.2
+    # 디스코드 웹훅 주소를 .env에서 받아 파일로 쓴 뒤 시작한다(주소는 레포·이미지에 남지 않는다).
+    # 비어 있으면 아무 데도 보내지 않는 설정으로 띄운다.
+    environment:
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if [ -n "$$DISCORD_WEBHOOK_URL" ]; then
+        printf '%s' "$$DISCORD_WEBHOOK_URL" > /alertmanager/discord_webhook && config=alertmanager.yml;
+        else echo "DISCORD_WEBHOOK_URL 없음: 디스코드로 보내지 않습니다" && config=alertmanager-off.yml; fi &&
+        exec /bin/alertmanager --config.file=/etc/alertmanager/$$config --storage.path=/alertmanager
+    volumes:
+      - ./infra/monitoring/alertmanager:/etc/alertmanager:ro
+    ports: ["127.0.0.1:9093:9093"]
 
   grafana:
     profiles: ["monitoring"]

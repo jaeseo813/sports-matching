@@ -7,6 +7,11 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+alerting:                   # 울린 경보를 Alertmanager로 넘긴다(디스코드 전송)
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   - job_name: teamup-api
     metrics_path: /metrics
