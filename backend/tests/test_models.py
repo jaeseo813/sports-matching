@@ -13,6 +13,7 @@ EXPECTED_TABLES = {
     "peer_reviews",
     "team_assignments",
     "matching_weights",
+    "notifications",
 }
 
 

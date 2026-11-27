@@ -81,7 +81,13 @@ async def test_signup_login_me(api: AsyncClient) -> None:
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"}
     )
     assert res.status_code == 200
-    assert res.json() == {"id": 1, "email": "a@example.com", "nickname": "tester", "gender": "male"}
+    assert res.json() == {
+        "id": 1,
+        "email": "a@example.com",
+        "nickname": "tester",
+        "gender": "male",
+        "is_admin": False,
+    }
 
 
 async def test_signup_duplicate_and_underage(api: AsyncClient) -> None:

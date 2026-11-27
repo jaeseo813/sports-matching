@@ -2,7 +2,13 @@ from datetime import datetime
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import GenderPolicy, MatchStatus, ParticipationStatus, Verdict
+from app.models.enums import (
+    GenderPolicy,
+    MatchStatus,
+    NotificationKind,
+    ParticipationStatus,
+    Verdict,
+)
 
 
 class MatchCreateIn(BaseModel):
@@ -59,6 +65,20 @@ class MySummaryOut(BaseModel):
     upcoming: int  # 참가 예정(수락됨, 시작 전)
     attended: int  # 참가 완료(출석 처리됨)
     manner_score: float
+
+
+class NotificationOut(BaseModel):
+    id: int
+    kind: NotificationKind
+    match_id: int
+    match_title: str
+    read: bool
+    created_at: datetime
+
+
+class NotificationsOut(BaseModel):
+    unread: int
+    items: list[NotificationOut]
 
 
 class ParticipationOut(BaseModel):

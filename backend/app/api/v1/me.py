@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, Response
 
 from app.api.deps import CurrentUser, MatchRepo, ProfileRepo, UserRepo, VenueRepo
-from app.schemas.match import MatchOut, MySummaryOut
+from app.schemas.match import MatchOut, MySummaryOut, NotificationsOut
 from app.schemas.profile import (
     BlockOut,
     LocationIn,
@@ -83,6 +83,17 @@ async def unblock(
     user_id: Annotated[int, Path(ge=1)], user: CurrentUser, repo: ProfileRepo
 ) -> Response:
     await profile_service.unblock(repo, user, user_id)
+    return Response(status_code=204)
+
+
+@router.get("/notifications", response_model=NotificationsOut)
+async def my_notifications(user: CurrentUser, matches: MatchRepo) -> NotificationsOut:
+    return await match_service.my_notifications(matches, user)
+
+
+@router.post("/notifications/read", status_code=204)
+async def read_notifications(user: CurrentUser, matches: MatchRepo) -> Response:
+    await match_service.read_notifications(matches, user)
     return Response(status_code=204)
 
 

@@ -8,6 +8,7 @@ export interface User {
   email: string;
   nickname: string;
   gender: Gender;
+  is_admin: boolean;
 }
 
 export interface SignupInput {

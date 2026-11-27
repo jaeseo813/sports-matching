@@ -26,6 +26,8 @@ erDiagram
     matches ||--o{ participations : ""
     matches ||--o{ team_assignments : ""
     matches ||--o{ peer_reviews : ""
+    users ||--o{ notifications : "받는 사람"
+    matches ||--o{ notifications : ""
 ```
 
 ## 테이블
@@ -42,7 +44,8 @@ erDiagram
 | `team_assignments` | match_id, user_id, team_no, position, is_manual                                                                                                    | (match_id, user_id) 유니크                                                |
 | `peer_reviews`     | match_id, reviewer_id, reviewee_id, verdict, manner_flag                                                                                           | (match_id, reviewer, reviewee) 유니크. 탈퇴 시 id를 NULL로 바꿔 익명 보존 |
 | `matching_weights` | name, w_dist, w_skill, w_time, w_host, w_fill, is_active                                                                                           | name 유니크. 기본값 `default` 행이 마이그레이션에 포함됨                  |
-| `user_blocks` | blocker_id, blocked_id, created_at | PK (blocker_id, blocked_id), 자기 자신 차단 금지(CHECK). 차단한 주최자는 추천에서 제외 |
+| `user_blocks` | blocker_id, blocked_id, created_at | PK (blocker_id, blocked_id), 자기 자신 차단 금지(CHECK). 차단한 주최자의 매치는 추천·목록에서 제외 |
+| `notifications` | user_id, match_id, kind(`accepted`/`confirmed`), read_at, created_at | 인덱스 (user_id, read_at). 문구는 저장하지 않고 화면이 만든다 |
 
 ## 알아둘 점
 

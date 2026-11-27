@@ -37,6 +37,11 @@ class ParticipationStatus(StrEnum):
     NO_SHOW = "no_show"
 
 
+class NotificationKind(StrEnum):
+    ACCEPTED = "accepted"  # 내 신청이 수락됨
+    CONFIRMED = "confirmed"  # 참가하는 매치가 확정됨
+
+
 class Verdict(StrEnum):
     """상호 평가: 상대가 나보다 어떤가."""
 

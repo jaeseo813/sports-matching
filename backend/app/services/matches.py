@@ -2,13 +2,28 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException
 
-from app.models.enums import Gender, GenderPolicy, MatchStatus, ParticipationStatus
+from app.models.enums import (
+    Gender,
+    GenderPolicy,
+    MatchStatus,
+    NotificationKind,
+    ParticipationStatus,
+)
 from app.models.match import Match
 from app.models.user import User
 from app.repositories.match import DuplicateParticipationError, MatchRepository
+from app.repositories.profile import ProfileRepository
 from app.repositories.user import UserRepository
 from app.repositories.venue import VenueRepository
-from app.schemas.match import MatchCreateIn, MatchOut, MySummaryOut, ParticipationOut
+from app.schemas.match import (
+    MatchCreateIn,
+    MatchOut,
+    MySummaryOut,
+    NotificationOut,
+    NotificationsOut,
+    ParticipationOut,
+)
+from app.services import profile as profile_service
 from app.services.match_state import can_transition, status_after_headcount
 from app.sports.registry import SPORTS
 
@@ -141,7 +156,9 @@ async def list_matches(
 ) -> list[MatchOut]:
     if sport is not None and sport not in SPORTS:
         raise _error(422, "UNKNOWN_SPORT", "지원하지 않는 종목입니다")
-    found = await matches.list_open(sport=sport, limit=min(limit, MAX_PAGE), offset=offset)
+    found = await matches.list_open(
+        sport=sport, limit=min(limit, MAX_PAGE), offset=offset, viewer_id=viewer_id
+    )
     counts = await matches.accepted_counts([m.id for m in found])
     return [
         await to_match_out(m, counts.get(m.id, 0), users, venues, viewer_id=viewer_id)
@@ -174,6 +191,38 @@ async def my_summary(matches: MatchRepository, user: User) -> MySummaryOut:
         attended=await matches.count_attended(user.id),
         manner_score=round(user.manner_score, 1),
     )
+
+
+async def my_notifications(matches: MatchRepository, user: User) -> NotificationsOut:
+    return NotificationsOut(
+        unread=await matches.count_unread(user.id),
+        items=[
+            NotificationOut(
+                id=n.id,
+                kind=n.kind,
+                match_id=n.match_id,
+                match_title=title,
+                read=n.read_at is not None,
+                created_at=n.created_at.replace(tzinfo=UTC),
+            )
+            for n, title in await matches.list_notifications(user.id, limit=20)
+        ],
+    )
+
+
+async def read_notifications(matches: MatchRepository, user: User) -> None:
+    await matches.mark_all_read(user.id, _now())
+    await matches.commit()
+
+
+async def block_host(
+    matches: MatchRepository, profiles: ProfileRepository, user: User, match_id: int
+) -> None:
+    """매치로 주최자를 찾아 차단한다. 주최자 id를 응답에 노출하지 않으려고 서버가 찾는다."""
+    match = await matches.get_match(match_id)
+    if match is None:
+        raise _error(404, "MATCH_NOT_FOUND", "매치를 찾을 수 없습니다")
+    await profile_service.block(profiles, user, match.host_id)
 
 
 async def apply(
@@ -250,6 +299,7 @@ async def decide(
         raise _error(409, "MATCH_FULL", "정원이 가득 찼습니다")
     part.status = ParticipationStatus.ACCEPTED
     match.status = status_after_headcount(match.status, accepted + 1, match.capacity)
+    matches.add_notification(part.user_id, match.id, NotificationKind.ACCEPTED)
     await matches.commit()
     return part.status
 
@@ -292,6 +342,9 @@ async def confirm_match(matches: MatchRepository, host: User, match_id: int) -> 
     if await matches.count_accepted(match_id) < match.min_players:
         raise _error(409, "NOT_ENOUGH_PLAYERS", "최소 인원이 모이지 않았습니다")
     match.status = MatchStatus.CONFIRMED
+    for user_id in await matches.joined_user_ids(match_id):
+        if user_id != host.id:  # 확정한 본인에게는 알리지 않는다
+            matches.add_notification(user_id, match_id, NotificationKind.CONFIRMED)
     await matches.commit()
     return match.status
 

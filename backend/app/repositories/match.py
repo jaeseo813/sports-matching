@@ -1,13 +1,14 @@
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import GenderPolicy, MatchStatus, ParticipationStatus
+from app.models.enums import GenderPolicy, MatchStatus, NotificationKind, ParticipationStatus
 from app.models.match import Match, Participation
-from app.models.user import User
+from app.models.notification import Notification
+from app.models.user import User, UserBlock
 
 # 참가 인원으로 세는 상태. 출석(ATTENDED)은 경기 종료 뒤에만 생기므로 정원·확정 판단에는 영향이 없고,
 # 경기 뒤에도 "4/4명"처럼 실제 뛴 인원이 보이게 한다
@@ -37,7 +38,9 @@ class MatchRepository(Protocol):
         tier_max: int,
     ) -> Match: ...
     async def get_match(self, match_id: int, *, for_update: bool = False) -> Match | None: ...
-    async def list_open(self, *, sport: str | None, limit: int, offset: int) -> list[Match]: ...
+    async def list_open(
+        self, *, sport: str | None, limit: int, offset: int, viewer_id: int | None
+    ) -> list[Match]: ...
     async def count_accepted(self, match_id: int) -> int: ...
     async def accepted_counts(self, match_ids: list[int]) -> dict[int, int]: ...
     async def get_participation(self, match_id: int, user_id: int) -> Participation | None: ...
@@ -49,6 +52,13 @@ class MatchRepository(Protocol):
     async def list_upcoming_for_user(self, user_id: int, *, limit: int) -> list[Match]: ...
     async def count_upcoming_for_user(self, user_id: int) -> int: ...
     async def count_attended(self, user_id: int) -> int: ...
+    async def joined_user_ids(self, match_id: int) -> list[int]: ...
+    def add_notification(self, user_id: int, match_id: int, kind: NotificationKind) -> None: ...
+    async def list_notifications(
+        self, user_id: int, *, limit: int
+    ) -> list[tuple[Notification, str]]: ...
+    async def count_unread(self, user_id: int) -> int: ...
+    async def mark_all_read(self, user_id: int, now: datetime) -> None: ...
     async def commit(self) -> None: ...
 
 
@@ -103,10 +113,15 @@ class SqlMatchRepository:
             stmt = stmt.with_for_update()  # 정원 초과 경합 방지: 같은 매치의 수락을 직렬화한다
         return (await self._session.execute(stmt)).scalar_one_or_none()
 
-    async def list_open(self, *, sport: str | None, limit: int, offset: int) -> list[Match]:
+    async def list_open(
+        self, *, sport: str | None, limit: int, offset: int, viewer_id: int | None
+    ) -> list[Match]:
         stmt = select(Match).where(Match.status.in_([MatchStatus.OPEN, MatchStatus.FULL]))
         if sport is not None:
             stmt = stmt.where(Match.sport == sport)
+        if viewer_id is not None:  # 내가 차단한 주최자의 매치는 보이지 않는다 (추천과 같게)
+            blocked = select(UserBlock.blocked_id).where(UserBlock.blocker_id == viewer_id)
+            stmt = stmt.where(Match.host_id.not_in(blocked))
         stmt = stmt.order_by(Match.starts_at, Match.id).limit(limit).offset(offset)
         return list((await self._session.execute(stmt)).scalars())
 
@@ -197,6 +212,41 @@ class SqlMatchRepository:
             Participation.status == ParticipationStatus.ATTENDED,
         )
         return int((await self._session.execute(stmt)).scalar_one())
+
+    async def joined_user_ids(self, match_id: int) -> list[int]:
+        stmt = select(Participation.user_id).where(
+            Participation.match_id == match_id, Participation.status.in_(JOINED_STATUSES)
+        )
+        return list((await self._session.execute(stmt)).scalars())
+
+    def add_notification(self, user_id: int, match_id: int, kind: NotificationKind) -> None:
+        # 상태 변경과 같은 트랜잭션으로 저장된다 (커밋은 서비스가 한다)
+        self._session.add(Notification(user_id=user_id, match_id=match_id, kind=kind))
+
+    async def list_notifications(
+        self, user_id: int, *, limit: int
+    ) -> list[tuple[Notification, str]]:
+        stmt = (
+            select(Notification, Match.title)
+            .join(Match, Match.id == Notification.match_id)
+            .where(Notification.user_id == user_id)
+            .order_by(Notification.id.desc())
+            .limit(limit)
+        )
+        return [(n, title) for n, title in (await self._session.execute(stmt)).all()]
+
+    async def count_unread(self, user_id: int) -> int:
+        stmt = select(func.count()).where(
+            Notification.user_id == user_id, Notification.read_at.is_(None)
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
+
+    async def mark_all_read(self, user_id: int, now: datetime) -> None:
+        await self._session.execute(
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.read_at.is_(None))
+            .values(read_at=now)
+        )
 
     async def commit(self) -> None:
         await self._session.commit()
