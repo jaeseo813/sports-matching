@@ -22,6 +22,12 @@ class LoginIn(BaseModel):
     password: str = Field(max_length=128)
 
 
+class WithdrawIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password: str = Field(max_length=128)  # 본인 확인
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"  # noqa: S105 (OAuth2 토큰 종류 이름)

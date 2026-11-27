@@ -56,7 +56,7 @@ Venue, Match(status: open→full→confirmed→completed/canceled, 경기 중 �
 웹해킹 전반이 아니라 **챗봇 입력 가드·출력 가드**를 만들고, 직접 공격해 우회하고 막는 과정을 학습한다. 웹 쪽은 아래 기본 규칙까지만 지킨다.
 세 파트로 나눠 맡는다: **A 챗봇 가드레일 / B 보안 대시보드(Grafana) / C RBAC 정책**. 파트별 범위·할 일과 세 파트를 잇는 보안 이벤트(`core/security_events.py` → `/metrics` → Grafana)는 `docs/security/README.md`.
 **방식**: 챗봇 v0 → 공격(Red: 공격 프롬프트 세트로 우회 시도, `docs/security/findings/NNN-*.md`에 재현/영향/증거/심각도) → 방어(Blue: 가드 보강 → 같은 세트로 재검증 → `tests/security/test_chat_*.py` 회귀 테스트).
-공격 실습은 **우리 소유 로컬·스테이징에서만**, **외부 공개 배포 금지**, 실제 개인정보 입력 금지(더미 데이터만). 위협 모델은 `docs/security/threat-model.md`.
+배포는 `docs/deploy.md`의 체크리스트대로 한다. **공격 실습은 우리 소유 로컬·스테이징에서만**, 운영(공개) 서버에는 공격하지 않는다. 실습에는 실제 개인정보를 넣지 않는다(더미 데이터만). 위협 모델은 `docs/security/threat-model.md`.
 
 **가드** (`services/chat_guard.py`, 챗봇 호출 앞뒤에서 항상 실행. 입력 규칙·마스킹은 LLM 호출 전에 끝내고, 입력 LLM 분류는 첫 호출과 동시에 돌리되 통과 전에는 그 결과를 쓰지 않는다)
 - 입력 가드: 길이 상한, 프롬프트 인젝션·탈옥(시스템 프롬프트 추출, 역할 바꾸기), 타인 정보 요청, 서비스 범위 밖 요청, 사용자가 넣은 개인정보(전화번호·이메일 등)

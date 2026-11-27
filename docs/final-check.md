@@ -19,10 +19,10 @@
 | 종목 페이지 | ✅ | 풋살·배드민턴·농구(#24) |
 | 관리자 구장 등록 | ✅ | 내 정보 → 구장 등록(관리자만). 관리자 지정: `uv run python -m scripts.make_admin <이메일>`. 좌표는 직접 입력 |
 | 매칭 알림 | ✅ | 앱 안 알림: 새 신청(주최자), 수락·거절(신청자), 매치 확정(참가자)·취소(참가자와 대기 중인 신청자). 30초마다 확인 |
-| 회원 탈퇴·리뷰 익명화 | ❌ | AGENTS.md 8절 |
+| 회원 탈퇴 | ✅ | 내 정보 → 회원 탈퇴(비밀번호 확인). 개인정보 삭제, 매치 기록·평가는 이름 없이 보존, 신청은 자동 취소, 주최 중이면 막음 |
 | 지도·매치룸 채팅 | ❌ | 하지 않기로 함 |
 
-## 2. API (`/api/v1`, 44개: 공개 3 · 로그인 40 · 관리자 1)
+## 2. API (`/api/v1`, 45개: 공개 3 · 로그인 41 · 관리자 1)
 
 | 영역 | 엔드포인트 | 권한 |
 |---|---|---|
@@ -44,6 +44,7 @@
 | 내 정보 | `/me/skills` (GET, PUT) · `/me/locations` (GET, PUT, DELETE) · `/me/preferences` (GET, PUT) · `/me/blocks` (GET, PUT, DELETE) | 본인 |
 | 내 활동 | `GET /me/summary` · `GET /me/matches` · `GET /me/venues` | 본인 |
 | 알림 | `GET /me/notifications` · `POST /me/notifications/read` | 본인 |
+| 탈퇴 | `POST /me/withdraw` (비밀번호 확인, 로그인과 같은 5/분) | 본인 |
 | 챗봇 | `POST /chat` (SSE) | 로그인 (20/5분, 24시간 토큰 20만) |
 
 `/api/v1` 밖: `GET /metrics` (`METRICS_TOKEN`, 비우면 local에서만 열림)
@@ -62,16 +63,16 @@
 
 ## 4. 검증
 - 알림·차단·구장 등록은 실서버 + 헤드리스 Chrome으로 데스크톱·모바일(375px) 확인
-- 백엔드: pytest 559개 통과(건너뜀 없음). CI: ruff, mypy, bandit, pip-audit, gitleaks
+- 백엔드: pytest 572개 통과(건너뜀 없음). CI: ruff, mypy, bandit, pip-audit, gitleaks
 - 프론트: 타입 검사 통과. **lint·자동 테스트 없음**
 
 ## 5. 배포 전에 할 일
 
 **반드시** (지금 AGENTS.md는 외부 공개 배포를 금지한다)
 1. ~~비밀번호 해싱~~ → #39 완료, 기존 원문 계정은 #41 마이그레이션으로 해시
-2. AGENTS.md 배포·공격 실습 문구 수정 (팀 합의)
-3. `ENV`·JWT 키·`METRICS_TOKEN` 등 운영 값 설정. `ENV` 기본값이 `local`이라 꼭 지정
-4. 회원 탈퇴·개인정보 삭제
+2. ~~AGENTS.md 배포·공격 실습 문구~~ → 완료 (배포는 `deploy.md`대로, 공격 실습은 로컬·스테이징만)
+3. ~~운영 설정~~ → 완료: 개발용 값이면 서버가 시작되지 않음, 도커 기본 `ENV=production`, 프록시 IP 처리, `.env.production.example`·`docs/deploy.md`. **실제 비밀 값은 배포하는 쪽에서 넣는다**
+4. ~~회원 탈퇴·개인정보 삭제~~ → 완료
 
 **권장**
 5. RBAC 권한 표와 테스트

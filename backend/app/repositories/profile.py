@@ -3,6 +3,7 @@ from typing import Protocol
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.notification import Notification
 from app.models.user import User, UserBlock, UserLocation, UserSkill
 
 
@@ -18,6 +19,7 @@ class ProfileRepository(Protocol):
     async def user_exists(self, user_id: int) -> bool: ...
     async def add_block(self, blocker_id: int, blocked_id: int) -> None: ...
     async def remove_block(self, blocker_id: int, blocked_id: int) -> None: ...
+    async def delete_personal_data(self, user_id: int) -> None: ...
     async def commit(self) -> None: ...
 
 
@@ -85,6 +87,18 @@ class SqlProfileRepository:
                 UserBlock.blocker_id == blocker_id, UserBlock.blocked_id == blocked_id
             )
         )
+
+    async def delete_personal_data(self, user_id: int) -> None:
+        """탈퇴: 위치·실력·차단(양방향)·알림을 지운다. 매치 기록과 평가는 남긴다(익명화한 사용자 행에 연결)."""
+        for stmt in (
+            delete(UserLocation).where(UserLocation.user_id == user_id),
+            delete(UserSkill).where(UserSkill.user_id == user_id),
+            delete(UserBlock).where(
+                (UserBlock.blocker_id == user_id) | (UserBlock.blocked_id == user_id)
+            ),
+            delete(Notification).where(Notification.user_id == user_id),
+        ):
+            await self._session.execute(stmt)
 
     async def commit(self) -> None:
         await self._session.commit()

@@ -1,8 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 
 from app.api.deps import CurrentUser, MatchRepo, ProfileRepo, UserRepo, VenueRepo
+from app.core.ratelimit import login_limiter
+from app.schemas.auth import WithdrawIn
 from app.schemas.match import MatchOut, MySummaryOut, NotificationsOut
 from app.schemas.profile import (
     BlockOut,
@@ -14,6 +16,7 @@ from app.schemas.profile import (
     SkillOut,
 )
 from app.schemas.venue import VenueOut
+from app.services import auth as auth_service
 from app.services import matches as match_service
 from app.services import profile as profile_service
 from app.services import venues as venue_service
@@ -121,3 +124,12 @@ async def venues_near_me(
     sport: Annotated[str | None, Query(max_length=20)] = None,
 ) -> list[VenueOut]:
     return await venue_service.venues_near_me(profiles, venues, user.id, sport=sport)
+
+
+# 비밀번호를 다시 받으므로 로그인과 같은 한도를 건다 (추측 공격 방지)
+@router.post("/withdraw", status_code=204, dependencies=[Depends(login_limiter)])
+async def withdraw(
+    data: WithdrawIn, user: CurrentUser, matches: MatchRepo, profiles: ProfileRepo
+) -> Response:
+    await auth_service.withdraw(matches, profiles, user, data.password)
+    return Response(status_code=204)

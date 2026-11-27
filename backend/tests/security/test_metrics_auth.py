@@ -18,8 +18,17 @@ def use_settings() -> Iterator[None]:
     app.dependency_overrides.pop(get_settings, None)
 
 
+# 스테이징·운영 설정은 개발용 값을 거부하므로(test_config) 안전한 값을 함께 넣는다
+_SAFE = {
+    "jwt_secret": "x" * 32,
+    "database_url": "mysql+asyncmy://teamup:strong-pass@db:3306/teamup",
+    "cors_origins": ["https://teamup.example"],
+}
+
+
 def _settings(**kwargs: str) -> None:
-    app.dependency_overrides[get_settings] = lambda: Settings(**kwargs)  # type: ignore[arg-type]
+    merged = {**_SAFE, **kwargs} if kwargs.get("env") != "local" else kwargs
+    app.dependency_overrides[get_settings] = lambda: Settings(**merged)  # type: ignore[arg-type]
 
 
 async def test_metrics_requires_token_when_set(api: AsyncClient, use_settings: None) -> None:
@@ -73,7 +82,7 @@ async def test_metrics_bearer_scheme_is_case_insensitive(
 async def test_metrics_closed_in_production_without_token(
     api: AsyncClient, use_settings: None
 ) -> None:
-    _settings(env="production", metrics_token="", jwt_secret="test-not-default-secret")
+    _settings(env="production", metrics_token="")
     assert (await api.get("/metrics")).status_code == 401
 
 
