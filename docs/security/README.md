@@ -117,13 +117,13 @@ docker compose --profile monitoring up -d
 **목표**: 누가 무엇을 할 수 있는지 역할·권한 표로 정리하고, 흩어진 검사를 그 표대로 맞춘다.
 
 **지금 상태**
-- 전역 역할은 `Role.USER` / `Role.ADMIN` 두 개(`models/enums.py`, `users.role`). `require_admin`은 `POST /venues` 한 곳만 쓴다.
-- 엔드포인트 40개: 공개 3개(`/auth/signup`, `/auth/login`, `/health`), 로그인 필요 36개, 관리자 1개.
+- 전역 역할은 `Role.USER` / `Role.ADMIN` 두 개(`models/enums.py`, `users.role`). 역할 의존성 `require_roles(...)`·`AdminUser`(`api/deps.py`, #39)가 있고, 관리자 전용은 `POST /venues` 한 곳이다.
+- 엔드포인트 45개(`/api/v1`): 공개 3개(`/auth/signup`, `/auth/login`, `/health`), 로그인 필요 41개, 관리자 1개. 목록은 [final-check.md](../final-check.md) 2절.
 - **매치 안에서의 역할**(주최자·참가자)은 서비스 코드에서 직접 검사한다:
-  - `services/matches.py:225` 주최자만 (신청 수락·거절, 확정·취소·시작·종료 등)
-  - `services/teams.py:30` 주최자만 (팀 분배·수정), `services/teams.py:102` 참가자만 (팀 보기)
-  - `services/reviews.py:39` 참가자만 (평가), `:72`, `:100` 주최자만 (출석·레이팅 반영)
-- 관리자를 만드는 방법이 없다(DB에서 `users.role`을 직접 바꿔야 함).
+  - `services/matches.py`의 `_require_host`: 주최자만 (신청자 목록·수락·거절, 확정·취소·종료)
+  - `services/teams.py`: 주최자만 (팀 분배·수정), 참가자만 (팀 보기 `get_teams`)
+  - `services/reviews.py`: 참가자만 (`submit_review`), 주최자만 (`set_attendance`, `apply_ratings`)
+- 관리자 지정: `uv run python -m scripts.make_admin <이메일>`(#40). 관리자를 만드는 API는 두지 않는다.
 
 **할 일**
 1. `docs/security/rbac.md`: 역할(비로그인 / 사용자 / 주최자 / 참가자 / 관리자, 필요하면 추가) × 엔드포인트 권한 표.

@@ -18,6 +18,9 @@ uv run pytest -q   # 테스트는 teamup_test DB를 쓴다 (처음 한 번 생�
 uv run python -m scripts.seed_dev   # 화면 확인용 더미 데이터 (구장·사용자·매치, 다시 실행해도 쌓이지 않음)
 ```
 
+## 배포
+배포 순서·필수 설정은 [docs/deploy.md](docs/deploy.md), 현재 상태 요약은 [docs/final-check.md](docs/final-check.md).
+
 ## 협업 규칙
 - `main` 직접 푸시 금지. `feat/<이슈번호>-<설명>` 브랜치 → PR → 리뷰 1명 승인 후 머지
 - 종목 담당자는 `frontend/src/sports/<종목>/` 안에서만 작업, 등록은 `registry.ts`
