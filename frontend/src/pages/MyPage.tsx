@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../lib/api/client";
+import Field from "../components/Field";
+import { ApiError, api, post } from "../lib/api/client";
 import type { BlockOut, LocationOut, SkillOut } from "../lib/api/types";
 import { useAuth } from "../lib/auth";
 import { trendLabel } from "../lib/labels";
@@ -17,7 +18,23 @@ export default function MyPage() {
   const locations = useApi<LocationOut[]>("/me/locations");
   const blocks = useApi<BlockOut[]>("/me/blocks");
   const [blockError, setBlockError] = useState(false);
+  const [leavePw, setLeavePw] = useState("");
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   if (!user) return null;
+
+  const withdraw = async () => {
+    if (!confirm("정말 탈퇴할까요? 개인정보가 지워지고 되돌릴 수 없어요.")) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await post("/me/withdraw", { password: leavePw });
+      await logout(); // 토큰을 지우고 시작 화면으로
+    } catch (e) {
+      setLeaveError(e instanceof ApiError ? e.message : "탈퇴하지 못했어요");
+      setLeaving(false);
+    }
+  };
 
   const unblock = async (id: number) => {
     setBlockError(false);
@@ -112,6 +129,26 @@ export default function MyPage() {
       >
         로그아웃
       </button>
+
+      <details className="rounded-xl border border-edge bg-white p-5">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-muted">회원 탈퇴</summary>
+        <p className="mt-2 text-sm text-muted">
+          이메일·비밀번호·활동 지역·실력·차단 목록·알림이 지워져요. 참가했던 매치 기록과 평가는 이름 없이 남아요. 신청한 매치는 자동으로 취소돼요.
+          주최 중인 매치가 있으면 먼저 취소해야 해요.
+        </p>
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void withdraw();
+          }}
+        >
+          <Field label="비밀번호 확인" type="password" required autoComplete="current-password" value={leavePw} onChange={(e) => setLeavePw(e.target.value)} error={leaveError ?? undefined} />
+          <button type="submit" disabled={leaving || !leavePw} className="min-h-12 w-full rounded-lg border border-night font-bold disabled:opacity-50">
+            {leaving ? "탈퇴하는 중…" : "탈퇴하기"}
+          </button>
+        </form>
+      </details>
     </div>
   );
 }

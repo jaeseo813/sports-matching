@@ -6,6 +6,7 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _INSECURE_DEFAULT = "change-me"
+_MIN_SECRET_LEN = 32  # HS256 키는 32바이트 이상 (RFC 7518 3.2)
 _ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"  # 레포 루트의 .env
 
 
@@ -37,9 +38,18 @@ class Settings(BaseSettings):
         return self.env == "production"
 
     @model_validator(mode="after")
-    def _reject_default_secret_in_production(self) -> "Settings":
-        if self.is_production and self.jwt_secret == _INSECURE_DEFAULT:
-            raise ValueError("운영 환경에서는 JWT_SECRET을 반드시 변경해야 합니다")
+    def _reject_unsafe_values_outside_local(self) -> "Settings":
+        """스테이징·운영에서 개발용 값이 남아 있으면 서버가 시작되지 않게 한다 (docs/deploy.md)."""
+        if self.env == "local":
+            return self
+        if self.jwt_secret == _INSECURE_DEFAULT or len(self.jwt_secret) < _MIN_SECRET_LEN:
+            raise ValueError(
+                f"{self.env}: JWT_SECRET을 {_MIN_SECRET_LEN}자 이상 무작위 값으로 바꿔야 합니다"
+            )
+        if f":{_INSECURE_DEFAULT}@" in self.database_url:
+            raise ValueError(f"{self.env}: DATABASE_URL의 기본 비밀번호를 바꿔야 합니다")
+        if self.is_production and any("localhost" in o for o in self.cors_origins):
+            raise ValueError("production: CORS_ORIGINS에 실제 화면 주소만 넣어야 합니다")
         return self
 
 

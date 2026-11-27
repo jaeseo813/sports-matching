@@ -53,6 +53,8 @@ class MatchRepository(Protocol):
     async def count_upcoming_for_user(self, user_id: int) -> int: ...
     async def count_attended(self, user_id: int) -> int: ...
     async def joined_user_ids(self, match_id: int) -> list[int]: ...
+    async def count_active_hosted(self, user_id: int) -> int: ...
+    async def active_applications(self, user_id: int) -> list[tuple[Participation, Match]]: ...
     def add_notification(self, user_id: int, match_id: int, kind: NotificationKind) -> None: ...
     async def list_notifications(
         self, user_id: int, *, limit: int
@@ -218,6 +220,27 @@ class SqlMatchRepository:
             Participation.match_id == match_id, Participation.status.in_(JOINED_STATUSES)
         )
         return list((await self._session.execute(stmt)).scalars())
+
+    async def count_active_hosted(self, user_id: int) -> int:
+        stmt = select(func.count()).where(Match.host_id == user_id, Match.status.in_(_UPCOMING))
+        return int((await self._session.execute(stmt)).scalar_one())
+
+    async def active_applications(self, user_id: int) -> list[tuple[Participation, Match]]:
+        """아직 끝나지 않은 매치에 걸려 있는 내 신청(대기·수락). 정원 재계산을 위해 매치를 잠근다."""
+        stmt = (
+            select(Participation, Match)
+            .join(Match, Match.id == Participation.match_id)
+            .where(
+                Participation.user_id == user_id,
+                Participation.status.in_(
+                    [ParticipationStatus.APPLIED, ParticipationStatus.ACCEPTED]
+                ),
+                Match.status.in_(_UPCOMING),
+            )
+            .order_by(Match.id)
+            .with_for_update()
+        )
+        return [(p, m) for p, m in (await self._session.execute(stmt)).all()]
 
     def add_notification(self, user_id: int, match_id: int, kind: NotificationKind) -> None:
         # 상태 변경과 같은 트랜잭션으로 저장된다 (커밋은 서비스가 한다)
